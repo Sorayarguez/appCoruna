@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+requests
+pandas
+geopandas
+scikit-learn
+faker
+paho-mqtt

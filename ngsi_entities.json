@@ -1,0 +1,65 @@
+[
+  {
+    "id": "urn:ngsi-ld:TrafficFlowObserved:Coruna-Segment-1",
+    "type": "TrafficFlowObserved",
+    "intensity": { "value": 450, "type": "Number" },
+    "occupancy": { "value": 0.35, "type": "Number" },
+    "averageVehicleSpeed": { "value": 42.5, "type": "Number" },
+    "laneDirection": { "value": "forward", "type": "Text" },
+    "vehicleType": { "value": "any", "type": "Text" },
+    "allowedVehicleType": { "value": ["car", "bus", "motorcycle"], "type": "StructuredValue" },
+    "location": {
+      "type": "geo:json",
+      "value": {
+        "type": "LineString",
+        "coordinates": [[-8.4115, 43.3623], [-8.4095, 43.3630]]
+      }
+    },
+    "refRoadSegment": { "value": "urn:ngsi-ld:RoadSegment:Coruna-1", "type": "Relationship" },
+    "dateObserved": { "value": "2026-05-01T10:00:00Z", "type": "DateTime" }
+  },
+  {
+    "id": "urn:ngsi-ld:ItemFlowObserved:Coruna-Pedestrian-1",
+    "type": "ItemFlowObserved",
+    "itemType": { "value": "pedestrian", "type": "Text" },
+    "intensity": { "value": 120, "type": "Number" },
+    "location": {
+      "type": "geo:json",
+      "value": {
+        "type": "Point",
+        "coordinates": [-8.4100, 43.3626]
+      }
+    },
+    "refRoadSegment": { "value": "urn:ngsi-ld:RoadSegment:Coruna-1", "type": "Relationship" },
+    "dateObserved": { "value": "2026-05-01T10:00:00Z", "type": "DateTime" }
+  },
+  {
+    "id": "urn:ngsi-ld:TrafficEnvironmentImpact:Coruna-Env-1",
+    "type": "TrafficEnvironmentImpact",
+    "NO2Concentration": { "value": 45.2, "type": "Number" },
+    "PM10Concentration": { "value": 20.1, "type": "Number" },
+    "PM25Concentration": { "value": 12.5, "type": "Number" },
+    "noiseLevel": { "value": 65.0, "type": "Number" },
+    "airQualityIndex": { "value": 40, "type": "Number" },
+    "refTrafficFlowObserved": { "value": "urn:ngsi-ld:TrafficFlowObserved:Coruna-Segment-1", "type": "Relationship" },
+    "location": {
+      "type": "geo:json",
+      "value": {
+        "type": "Point",
+        "coordinates": [-8.4105, 43.3625]
+      }
+    },
+    "dateObserved": { "value": "2026-05-01T10:00:00Z", "type": "DateTime" }
+  },
+  {
+    "id": "urn:ngsi-ld:TrafficEnvironmentImpactForecast:Coruna-Forecast-1",
+    "type": "TrafficEnvironmentImpactForecast",
+    "NO2Concentration": { "value": 55.0, "type": "Number" },
+    "PM25Concentration": { "value": 15.0, "type": "Number" },
+    "airQualityIndex": { "value": 50, "type": "Number" },
+    "validFrom": { "value": "2026-05-01T11:00:00Z", "type": "DateTime" },
+    "validTo": { "value": "2026-05-01T12:00:00Z", "type": "DateTime" },
+    "refTrafficEnvironmentImpact": { "value": "urn:ngsi-ld:TrafficEnvironmentImpact:Coruna-Env-1", "type": "Relationship" },
+    "refTrafficFlowObserved": { "value": "urn:ngsi-ld:TrafficFlowObserved:Coruna-Segment-1", "type": "Relationship" }
+  }
+]

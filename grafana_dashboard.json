@@ -1,0 +1,69 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "URBS - Panel de Bienestar Urbano A Coruña",
+    "tags": [ "urbs", "fiware", "smartcity" ],
+    "timezone": "browser",
+    "schemaVersion": 16,
+    "version": 0,
+    "refresh": "10s",
+    "panels": [
+      {
+        "type": "timeseries",
+        "title": "Evolución temporal NO2 + Intensidad tráfico",
+        "gridPos": { "h": 9, "w": 12, "x": 0, "y": 0 },
+        "options": {
+          "legend": { "displayMode": "list", "placement": "bottom" }
+        },
+        "targets": [
+          {
+            "rawSql": "SELECT time_index, NO2Concentration FROM mturbs.ettrafficenvironmentimpact ORDER BY time_index DESC LIMIT 100",
+            "format": "time_series",
+            "refId": "A"
+          },
+          {
+            "rawSql": "SELECT time_index, intensity FROM mturbs.ettrafficflowobserved ORDER BY time_index DESC LIMIT 100",
+            "format": "time_series",
+            "refId": "B"
+          }
+        ]
+      },
+      {
+        "type": "heatmap",
+        "title": "Mapa de calor horario por zona",
+        "gridPos": { "h": 9, "w": 12, "x": 12, "y": 0 },
+        "targets": [
+          {
+            "rawSql": "SELECT time_index, NO2Concentration FROM mturbs.ettrafficenvironmentimpact ORDER BY time_index DESC",
+            "format": "time_series",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "type": "barchart",
+        "title": "ZBE Activas vs Calidad del Aire",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 9 },
+        "targets": [
+          {
+            "rawSql": "SELECT entity_id, PM25Concentration FROM mturbs.ettrafficenvironmentimpact GROUP BY entity_id",
+            "format": "table",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "type": "table",
+        "title": "Alertas Activas (> Umbral NO2)",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 9 },
+        "targets": [
+          {
+            "rawSql": "SELECT time_index, entity_id, NO2Concentration FROM mturbs.ettrafficenvironmentimpact WHERE NO2Concentration > 80 ORDER BY time_index DESC LIMIT 10",
+            "format": "table",
+            "refId": "A"
+          }
+        ]
+      }
+    ]
+  }
+}
