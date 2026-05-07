@@ -2,6 +2,9 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime, timedelta
 import requests
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+import os
 
 app = FastAPI(title="URBS API - Módulos Mejorados")
 
@@ -12,6 +15,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+os.makedirs("static", exist_ok=True)
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+@app.get("/")
+def serve_index():
+    return FileResponse("static/index.html")
 
 ORION_URL = "http://orion:1026/v2"
 OLLAMA_URL = "http://ollama:11434/api/generate"
