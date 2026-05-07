@@ -1,23 +1,15 @@
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
+from flask import Flask, request, jsonify
+from flask_cors import CORS
 from datetime import datetime, timedelta
 import requests
+import math
+import heapq
 
-app = FastAPI(title="URBS API - Módulos Mejorados")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app = Flask(__name__)
+CORS(app)
 
 ORION_URL = "http://orion:1026/v2"
 OLLAMA_URL = "http://ollama:11434/api/generate"
-
-import math
-import heapq
 
 def get_entities(entity_type):
     try:
@@ -26,15 +18,16 @@ def get_entities(entity_type):
     except:
         return []
 
-@app.get("/api/route")
-def get_green_route(origin: str = None, destination: str = None):
-    """Módulo 1: GreenRoute. Calcula una ruta basada en el índice de salubridad."""
+@app.route("/api/route", methods=["GET"])
+def get_green_route():
+    origin = request.args.get("origin")
+    destination = request.args.get("destination")
+    
     impacts = get_entities("TrafficEnvironmentImpact")
     flows = get_entities("TrafficFlowObserved")
     forecasts = get_entities("TrafficEnvironmentImpactForecast")
     items = get_entities("ItemFlowObserved")
     
-    # Mapeo de entidades por refTrafficFlowObserved (Segmento)
     data_map = {}
     for flow in flows:
         seg_id = flow["id"].split(":")[-1]
@@ -48,7 +41,6 @@ def get_green_route(origin: str = None, destination: str = None):
     for fc in forecasts:
         if "refTrafficFlowObserved" in fc:
             seg_id = fc["refTrafficFlowObserved"]["value"].split(":")[-1]
-            # Solo la previsión a +4h o la más reciente
             if seg_id in data_map: data_map[seg_id]["forecast"] = fc
             
     for item in items:
@@ -66,23 +58,17 @@ def get_green_route(origin: str = None, destination: str = None):
         pm25 = imp.get("PM25Concentration", {}).get("value", 0)
         noise = imp.get("noiseLevel", {}).get("value", 0)
         
-        # Flujo de tráfico
         flow = data["flow"]
         intensity = flow.get("intensity", {}).get("value", 0) if flow else 0
         
-        # Previsión
         fc = data["forecast"]
         fc_no2 = fc.get("NO2Concentration", {}).get("value", no2) if fc else no2
         
-        # Item flow (peatones)
         it = data["items"]
         pedestrians = it.get("intensity", {}).get("value", 0) if it else 0
         
-        # Calcular índice de salubridad combinando todo
-        # Penaliza NO2, PM25, Ruido, Tráfico, y previsión futura
-        # Beneficia (ligeramente) zonas con alta afluencia peatonal si no hay polución
         salubrity_score = 100 - (no2 * 0.4 + pm25 * 0.3 + noise * 0.1 + (intensity/10) * 0.1 + fc_no2 * 0.1)
-        salubrity_index = max(0.1, min(100, salubrity_score)) # Evitar 0 para cálculos de coste
+        salubrity_index = max(0.1, min(100, salubrity_score))
         
         color = "#39ff14" if salubrity_index > 75 else "#ffff00" if salubrity_index > 45 else "#ff3366"
         
@@ -94,36 +80,28 @@ def get_green_route(origin: str = None, destination: str = None):
             "pm25": pm25,
             "noise": noise,
             "pedestrians": pedestrians,
+            "intensity": intensity,
             "color": color
         })
         
-    # Si no hay origen ni destino explícito, devolvemos todo como "heatmap"
     if not origin or not destination:
-        return {"route": route_segments, "is_path": False}
+        return jsonify({"route": route_segments, "is_path": False})
         
-    # Lógica de cálculo de ruta (Grafo completo con Dijkstra)
-    # Coste = distancia_euclídea * factor_insalubridad
-    # Factor insalubridad = (100 - salubrity_index) + 1 (para evitar coste 0)
-    
     seg_dict = {s["segmentId"]: s for s in route_segments}
     if origin not in seg_dict or destination not in seg_dict:
-        return {"route": route_segments, "is_path": False, "error": "Origen o destino no encontrados"}
+        return jsonify({"route": route_segments, "is_path": False, "error": "Origen o destino no encontrados"})
         
     def dist(s1, s2):
         return math.hypot(s1["coordinates"][0] - s2["coordinates"][0], s1["coordinates"][1] - s2["coordinates"][1])
         
-    # Construir grafo
     graph = {s["segmentId"]: [] for s in route_segments}
     for s1 in route_segments:
-        # Conectar con los 4 más cercanos para no hacer grafo denso irracional
         dists = [(dist(s1, s2), s2) for s2 in route_segments if s1["segmentId"] != s2["segmentId"]]
         dists.sort(key=lambda x: x[0])
         for d, s2 in dists[:4]:
-            # El coste es la distancia ponderada por lo perjudicial que es el destino
             cost = d * ((100 - s2["salubrityIndex"]) + 5) 
             graph[s1["segmentId"]].append((cost, s2["segmentId"]))
             
-    # Dijkstra
     pq = [(0, origin, [])]
     visited = set()
     best_path = []
@@ -145,19 +123,15 @@ def get_green_route(origin: str = None, destination: str = None):
             if neighbor not in visited:
                 heapq.heappush(pq, (cost + edge_cost, neighbor, path))
                 
-    # Reconstruir la ruta resultante
     final_route = [seg_dict[node] for node in best_path]
-    return {"route": final_route, "is_path": True}
+    return jsonify({"route": final_route, "is_path": True})
 
-@app.get("/api/dashboard")
+@app.route("/api/dashboard", methods=["GET"])
 def get_dashboard_data():
-    """Módulo 2: UrbanPulse. Retorna los datos actuales para el Dashboard."""
-    return get_entities("TrafficEnvironmentImpact")
+    return jsonify(get_entities("TrafficEnvironmentImpact"))
 
-@app.get("/api/explain/{segment_id}")
-def explain_pollution(segment_id: str):
-    """Módulo 2: LLM local explica la situación de contaminación."""
-    # Buscar impacto actual
+@app.route("/api/explain/<segment_id>", methods=["GET"])
+def explain_pollution(segment_id):
     res_imp = requests.get(f"{ORION_URL}/entities/urn:ngsi-ld:TrafficEnvironmentImpact:{segment_id}", headers={"fiware-service": "urbs"})
     if res_imp.status_code == 200:
         imp = res_imp.json()
@@ -182,21 +156,38 @@ def explain_pollution(segment_id: str):
         }, timeout=15)
         
         if res.status_code == 200:
-            return {"explanation": res.json().get("response", "No response")}
-        return {"explanation": "Modelo LLM no disponible."}
+            return jsonify({"explanation": res.json().get("response", "No response")})
+        return jsonify({"explanation": "Modelo LLM no disponible."})
     except Exception as e:
-        return {"explanation": f"El nivel actual de NO2 de {no2} µg/m³ está directamente causado por la intensidad de {intensity} vehículos en {segment_id}. Se recomienda activar medidas de restricción de acceso si persiste el volumen de tráfico actual."}
+        return jsonify({"explanation": f"El nivel actual de NO2 de {no2} µg/m³ está directamente causado por la intensidad de {intensity} vehículos en {segment_id}. Se recomienda activar medidas de restricción de acceso si persiste el volumen de tráfico actual."})
 
-@app.post("/api/ecozones/{zone_id}/activate")
-def activate_ecozone(zone_id: str):
-    """Módulo 3: EcoZones. Activa la Zona de Bajas Emisiones dinámicamente."""
-    # Modificar allowedVehicleType de todos los segmentos de tráfico a solo residentes y eléctricos
+@app.route("/api/chat", methods=["POST"])
+def chat_urbs():
+    data = request.json
+    user_message = data.get("message", "")
+    
+    prompt = f"Eres URBS, el asistente virtual inteligente de movilidad y medio ambiente de A Coruña. Un ciudadano te pregunta: '{user_message}'. Responde de forma concisa y amigable en español."
+    
+    try:
+        res = requests.post(OLLAMA_URL, json={
+            "model": "llama3",
+            "prompt": prompt,
+            "stream": False
+        }, timeout=15)
+        
+        if res.status_code == 200:
+            return jsonify({"response": res.json().get("response", "Lo siento, no pude procesar tu solicitud.")})
+        return jsonify({"response": "Modelo LLM no disponible."})
+    except Exception as e:
+        return jsonify({"response": "Hola, soy URBS. Actualmente no puedo conectar con mi núcleo de IA, pero te recomiendo evitar las zonas céntricas por alto tráfico."})
+
+@app.route("/api/ecozones/<zone_id>/activate", methods=["POST"])
+def activate_ecozone(zone_id):
     flows = get_entities("TrafficFlowObserved")
     affected_segments = 0
     
     for flow in flows:
         flow_id = flow["id"]
-        # En una app real, filtraríamos por zone_id. Aquí aplicamos a todos para el demo.
         payload = {
             "allowedVehicleType": {
                 "value": ["electric", "resident", "publicTransport"],
@@ -206,8 +197,6 @@ def activate_ecozone(zone_id: str):
         res = requests.post(f"{ORION_URL}/entities/{flow_id}/attrs", json=payload, headers={"fiware-service": "urbs"})
         if res.status_code == 204:
             affected_segments += 1
-            
-            # Generar una previsión positiva a 1h
             seg_str = flow_id.split(":")[-1]
             forecast_id = f"urn:ngsi-ld:TrafficEnvironmentImpactForecast:{seg_str}-ZBE"
             valid_from = datetime.utcnow().isoformat() + "Z"
@@ -215,22 +204,20 @@ def activate_ecozone(zone_id: str):
             forecast_data = {
                 "id": forecast_id,
                 "type": "TrafficEnvironmentImpactForecast",
-                "NO2Concentration": {"value": 20.0, "type": "Number"}, # Fuerte bajada simulada
+                "NO2Concentration": {"value": 20.0, "type": "Number"},
                 "PM25Concentration": {"value": 5.0, "type": "Number"},
                 "airQualityIndex": {"value": 15, "type": "Number"},
                 "validFrom": {"value": valid_from, "type": "DateTime"},
                 "validTo": {"value": valid_to, "type": "DateTime"},
                 "refTrafficFlowObserved": {"value": flow_id, "type": "Relationship"}
             }
-            # Evita error si ya existe
             requests.post(f"{ORION_URL}/entities", json=forecast_data, headers={"fiware-service": "urbs", "Content-Type": "application/json"})
             requests.post(f"{ORION_URL}/entities/{forecast_id}/attrs", json={"NO2Concentration":{"value":20.0,"type":"Number"}, "validFrom":{"value":valid_from,"type":"DateTime"}}, headers={"fiware-service": "urbs"})
 
-    return {"status": "success", "message": f"ZBE activada. {affected_segments} segmentos restringidos a vehículos limpios. Previsión actualizada."}
+    return jsonify({"status": "success", "message": f"ZBE activada. {affected_segments} segmentos restringidos a vehículos limpios. Previsión actualizada."})
 
-@app.post("/api/ecozones/{zone_id}/deactivate")
-def deactivate_ecozone(zone_id: str):
-    """Módulo 3: EcoZones. Desactiva la ZBE."""
+@app.route("/api/ecozones/<zone_id>/deactivate", methods=["POST"])
+def deactivate_ecozone(zone_id):
     flows = get_entities("TrafficFlowObserved")
     for flow in flows:
         flow_id = flow["id"]
@@ -241,11 +228,10 @@ def deactivate_ecozone(zone_id: str):
             }
         }
         requests.post(f"{ORION_URL}/entities/{flow_id}/attrs", json=payload, headers={"fiware-service": "urbs"})
-    return {"status": "success", "message": "ZBE desactivada."}
+    return jsonify({"status": "success", "message": "ZBE desactivada."})
 
-@app.get("/api/3d/pollution")
+@app.route("/api/3d/pollution", methods=["GET"])
 def get_3d_pollution():
-    """Endpoint para renderizar volumétricas en Three.js"""
     impacts = get_entities("TrafficEnvironmentImpact")
     points = []
     for d in impacts:
@@ -256,4 +242,7 @@ def get_3d_pollution():
             "lon": coords[0],
             "intensity": val
         })
-    return {"points": points}
+    return jsonify({"points": points})
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=8000, debug=True)
