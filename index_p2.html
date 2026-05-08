@@ -282,11 +282,6 @@ setTimeout(()=>{initImpactChart();},300);
 });
 
 onMounted(async()=>{
-try {
-  mermaid.initialize({startOnLoad:false, theme:'dark', securityLevel:'loose'});
-  mermaid.run();
-} catch(e) { console.error("Mermaid init error:", e); }
-
 await fetchDash();
 setTimeout(()=>{initDashMap();updateDashMap();},400);
 setInterval(fetchDash,30000);

@@ -8,7 +8,6 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
@@ -110,6 +109,125 @@ body {
   transition: 0.3s;
 }
 .card:hover { border-color: rgba(0, 229, 255, 0.3); box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4); }
+
+.fiware-diagram {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 16px;
+  min-height: 620px;
+  padding: 22px;
+  border-radius: 18px;
+  overflow: hidden;
+  background: linear-gradient(180deg, rgba(4, 10, 24, 0.9), rgba(10, 16, 32, 0.96));
+  border: 1px solid rgba(0, 229, 255, 0.16);
+}
+.fiware-diagram::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at top, rgba(0, 229, 255, 0.1), transparent 45%),
+              linear-gradient(135deg, rgba(255,255,255,0.03), transparent 40%);
+  pointer-events: none;
+}
+.fiware-links {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.fiware-note {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  z-index: 2;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.32);
+  border: 1px solid rgba(0, 229, 255, 0.22);
+  color: var(--muted);
+  font-size: 0.75rem;
+  letter-spacing: 0.3px;
+}
+.fiware-node {
+  position: relative;
+  z-index: 1;
+  padding: 18px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(24, 33, 54, 0.95), rgba(10, 16, 30, 0.95));
+  border: 1px solid rgba(0, 229, 255, 0.16);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+  transition: 0.3s;
+}
+.fiware-node:hover {
+  transform: translateY(-3px);
+  border-color: rgba(0, 229, 255, 0.35);
+  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.45);
+}
+.fiware-node__title {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 10px;
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--text);
+}
+.fiware-node__title span { color: var(--primary); }
+.fiware-node__meta {
+  color: var(--muted);
+  font-size: 0.83rem;
+  line-height: 1.55;
+}
+.fiware-node__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+.fiware-chip {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: rgba(0, 229, 255, 0.1);
+  border: 1px solid rgba(0, 229, 255, 0.18);
+  color: #d8fbff;
+}
+.fiware-node--primary { grid-column: 4 / span 6; grid-row: 1; }
+.fiware-node--impact { grid-column: 1 / span 4; grid-row: 2; }
+.fiware-node--air { grid-column: 5 / span 4; grid-row: 2; }
+.fiware-node--forecast { grid-column: 9 / span 4; grid-row: 2; }
+.fiware-node--noise { grid-column: 1 / span 4; grid-row: 3; }
+.fiware-node--device { grid-column: 5 / span 4; grid-row: 3; }
+.fiware-node--model { grid-column: 9 / span 4; grid-row: 3; }
+
+@media (max-width: 1100px) {
+  .fiware-diagram {
+    grid-template-columns: 1fr;
+    min-height: auto;
+    padding-top: 58px;
+  }
+  .fiware-links { display: none; }
+  .fiware-node,
+  .fiware-node--primary,
+  .fiware-node--impact,
+  .fiware-node--air,
+  .fiware-node--forecast,
+  .fiware-node--noise,
+  .fiware-node--device,
+  .fiware-node--model {
+    grid-column: auto;
+    grid-row: auto;
+  }
+  .fiware-note {
+    position: static;
+    display: inline-flex;
+    margin-bottom: 16px;
+  }
+}
 
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
 .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 24px; }
@@ -270,26 +388,85 @@ body {
         </div>
         <div class="card">
           <h3 style="margin-bottom:16px;font-size:1.1rem;color:var(--primary)">📐 Arquitectura de Datos: Entidades FIWARE</h3>
-          <div class="mermaid" id="mermaid-uml" style="background:rgba(0,0,0,0.3); padding:20px; border-radius:12px; display:flex; justify-content:center;">
-classDiagram
-  TrafficFlowObserved : String id
-  TrafficFlowObserved : Number intensity
-  TrafficEnvironmentImpact : String id
-  TrafficEnvironmentImpact : Number NO2Concentration
-  TrafficEnvironmentImpact : Number greenScore
-  AirQualityObserved : String id
-  AirQualityObserved : Number AQI
-  NoiseLevelObserved : String id
-  NoiseLevelObserved : Number LAeq
-  Device : String id
-  Device : String category
-  DeviceModel : String id
-  DeviceModel : String brandName
-  TrafficEnvironmentImpactForecast : String id
-  TrafficEnvironmentImpactForecast : Number forecastHour
-  TrafficEnvironmentImpact --> TrafficFlowObserved : refTrafficFlowObserved
-  TrafficEnvironmentImpactForecast --> TrafficFlowObserved : refTrafficFlowObserved
-  Device --> DeviceModel : refDeviceModel
+          <div class="fiware-diagram" aria-label="Diagrama visual de entidades FIWARE y sus relaciones">
+            <div class="fiware-note">Relaciones directas: refTrafficFlowObserved y refDeviceModel</div>
+            <svg class="fiware-links" viewBox="0 0 1200 760" preserveAspectRatio="none" aria-hidden="true">
+              <defs>
+                <linearGradient id="fiware-line" x1="0" x2="1" y1="0" y2="0">
+                  <stop offset="0%" stop-color="#00e5ff" stop-opacity="0.95"></stop>
+                  <stop offset="100%" stop-color="#00a3ff" stop-opacity="0.9"></stop>
+                </linearGradient>
+                <marker id="fiware-arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
+                  <path d="M0,0 L12,6 L0,12 z" fill="#00e5ff"></path>
+                </marker>
+              </defs>
+              <path d="M600 182 C600 238 380 238 250 314" fill="none" stroke="url(#fiware-line)" stroke-width="4" stroke-linecap="round" marker-end="url(#fiware-arrow)"/>
+              <path d="M600 182 C600 238 820 238 950 314" fill="none" stroke="url(#fiware-line)" stroke-width="4" stroke-linecap="round" marker-end="url(#fiware-arrow)"/>
+              <path d="M726 628 C820 628 888 628 982 628" fill="none" stroke="url(#fiware-line)" stroke-width="4" stroke-linecap="round" marker-end="url(#fiware-arrow)"/>
+            </svg>
+            <section class="fiware-node fiware-node--primary">
+              <div class="fiware-node__title"><span>TrafficFlowObserved</span><span>base</span></div>
+              <div class="fiware-node__meta">Flujo vehicular observado en tiempo real sobre el tramo urbano.</div>
+              <div class="fiware-node__chips">
+                <span class="fiware-chip">intensity</span>
+                <span class="fiware-chip">averageVehicleSpeed</span>
+                <span class="fiware-chip">occupancy</span>
+              </div>
+            </section>
+            <section class="fiware-node fiware-node--impact">
+              <div class="fiware-node__title"><span>TrafficEnvironmentImpact</span><span>impacto</span></div>
+              <div class="fiware-node__meta">Relaciona el tráfico con el impacto ambiental medido en el mismo punto.</div>
+              <div class="fiware-node__chips">
+                <span class="fiware-chip">NO2Concentration</span>
+                <span class="fiware-chip">PM25Concentration</span>
+                <span class="fiware-chip">noiseLevel</span>
+              </div>
+            </section>
+            <section class="fiware-node fiware-node--air">
+              <div class="fiware-node__title"><span>AirQualityObserved</span><span>calidad</span></div>
+              <div class="fiware-node__meta">Lectura atmosférica consolidada para la monitorización urbana.</div>
+              <div class="fiware-node__chips">
+                <span class="fiware-chip">NO2</span>
+                <span class="fiware-chip">PM2.5</span>
+                <span class="fiware-chip">PM10</span>
+                <span class="fiware-chip">CO2</span>
+                <span class="fiware-chip">airQualityIndex</span>
+              </div>
+            </section>
+            <section class="fiware-node fiware-node--forecast">
+              <div class="fiware-node__title"><span>TrafficEnvironmentImpactForecast</span><span>forecast</span></div>
+              <div class="fiware-node__meta">Proyección a corto plazo del impacto ambiental en función del tráfico actual.</div>
+              <div class="fiware-node__chips">
+                <span class="fiware-chip">hoursAhead</span>
+                <span class="fiware-chip">NO2Concentration</span>
+                <span class="fiware-chip">PM25Concentration</span>
+              </div>
+            </section>
+            <section class="fiware-node fiware-node--noise">
+              <div class="fiware-node__title"><span>NoiseLevelObserved</span><span>ruido</span></div>
+              <div class="fiware-node__meta">Captura el nivel de ruido ambiental de forma independiente.</div>
+              <div class="fiware-node__chips">
+                <span class="fiware-chip">loudness</span>
+                <span class="fiware-chip">dateObserved</span>
+              </div>
+            </section>
+            <section class="fiware-node fiware-node--device">
+              <div class="fiware-node__title"><span>Device</span><span>origen</span></div>
+              <div class="fiware-node__meta">Entidad genérica del sensor o dispositivo que alimenta la plataforma.</div>
+              <div class="fiware-node__chips">
+                <span class="fiware-chip">id</span>
+                <span class="fiware-chip">category</span>
+                <span class="fiware-chip">refDeviceModel</span>
+              </div>
+            </section>
+            <section class="fiware-node fiware-node--model">
+              <div class="fiware-node__title"><span>DeviceModel</span><span>catálogo</span></div>
+              <div class="fiware-node__meta">Define el modelo físico y sus atributos de fabricación.</div>
+              <div class="fiware-node__chips">
+                <span class="fiware-chip">id</span>
+                <span class="fiware-chip">brandName</span>
+              </div>
+            </section>
           </div>
         </div>
       </div>
@@ -781,11 +958,6 @@ setTimeout(()=>{initImpactChart();},300);
 });
 
 onMounted(async()=>{
-try {
-  mermaid.initialize({startOnLoad:false, theme:'dark', securityLevel:'loose'});
-  mermaid.run();
-} catch(e) { console.error("Mermaid init error:", e); }
-
 await fetchDash();
 setTimeout(()=>{initDashMap();updateDashMap();},400);
 setInterval(fetchDash,30000);
