@@ -272,35 +272,21 @@ body {
           <h3 style="margin-bottom:16px;font-size:1.1rem;color:var(--primary)">📐 Arquitectura de Datos: Entidades FIWARE</h3>
           <div class="mermaid" id="mermaid-uml" style="background:rgba(0,0,0,0.3); padding:20px; border-radius:12px; display:flex; justify-content:center;">
 classDiagram
-  class TrafficFlowObserved {
-    +String id
-    +Number intensity
-  }
-  class TrafficEnvironmentImpact {
-    +String id
-    +Number NO2Concentration
-    +Number greenScore
-  }
-  class AirQualityObserved {
-    +String id
-    +Number AQI
-  }
-  class NoiseLevelObserved {
-    +String id
-    +Number LAeq
-  }
-  class Device {
-    +String id
-    +String category
-  }
-  class DeviceModel {
-    +String id
-    +String brandName
-  }
-  class TrafficEnvironmentImpactForecast {
-    +String id
-    +Number forecastHour
-  }
+  TrafficFlowObserved : String id
+  TrafficFlowObserved : Number intensity
+  TrafficEnvironmentImpact : String id
+  TrafficEnvironmentImpact : Number NO2Concentration
+  TrafficEnvironmentImpact : Number greenScore
+  AirQualityObserved : String id
+  AirQualityObserved : Number AQI
+  NoiseLevelObserved : String id
+  NoiseLevelObserved : Number LAeq
+  Device : String id
+  Device : String category
+  DeviceModel : String id
+  DeviceModel : String brandName
+  TrafficEnvironmentImpactForecast : String id
+  TrafficEnvironmentImpactForecast : Number forecastHour
   TrafficEnvironmentImpact --> TrafficFlowObserved : refTrafficFlowObserved
   TrafficEnvironmentImpactForecast --> TrafficFlowObserved : refTrafficFlowObserved
   Device --> DeviceModel : refDeviceModel
@@ -688,19 +674,46 @@ const z=zonas.value.length?zonas.value:syntheticZones();
 z.forEach(zone=>{L.circleMarker([zone.lat,zone.lon],{radius:6,color:'#00e5ff',fillColor:'#00e5ff',fillOpacity:0.4,weight:1}).addTo(ecoMap).bindPopup(zone.name);});
 };
 
-const drawEcoRoutes=()=>{
+const drawEcoRoutes=async()=>{
 if(!ecoMap)return;
 ecoLayers.forEach(l=>ecoMap.removeLayer(l));ecoLayers=[];
-rutas.value.forEach(r=>{
-const pts=r.points.map(p=>[p.lat,p.lon]);
-if(pts.length<2)return;
-const pl=L.polyline(pts,{color:r.color,weight:6,opacity:0.8});
-pl.addTo(ecoMap);ecoLayers.push(pl);
-pl.bindTooltip(r.name,{sticky:true});
-});
+
+let profile = 'foot';
+if(tMode.value === 'car' || tMode.value === 'bus') profile = 'driving';
+else if(tMode.value === 'bike') profile = 'cycling';
+
+for(const r of rutas.value) {
+  const pts = r.points;
+  if(pts.length < 2) continue;
+  const coordsStr = pts.map(p => `${p.lon},${p.lat}`).join(';');
+  try {
+    const res = await fetch(`https://router.project-osrm.org/route/v1/${profile}/${coordsStr}?overview=full&geometries=geojson`);
+    const data = await res.json();
+    if(data.routes && data.routes.length > 0) {
+      const osrmDist = data.routes[0].distance / 1000;
+      r.distKm = parseFloat(osrmDist.toFixed(2));
+      const latlngs = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+      const pl = L.polyline(latlngs, {color: r.color, weight: 6, opacity: 0.8});
+      pl.addTo(ecoMap);
+      ecoLayers.push(pl);
+      pl.bindTooltip(r.name, {sticky: true});
+      continue;
+    }
+  } catch(e) { console.error("OSRM error:", e); }
+  
+  // fallback straight lines
+  const pl=L.polyline(pts.map(p=>[p.lat,p.lon]),{color:r.color,weight:6,opacity:0.8});
+  pl.addTo(ecoMap);ecoLayers.push(pl);
+  pl.bindTooltip(r.name,{sticky:true});
+}
+
 if(rutas.value.length&&rutas.value[0].points.length>1){
 const pts=rutas.value[0].points.map(p=>[p.lat,p.lon]);ecoMap.fitBounds(L.latLngBounds(pts),{padding:[30,30]});}
 };
+
+watch(tMode, () => {
+  if(tab.value === 'ecoruta' && rutas.value.length > 0) drawEcoRoutes();
+});
 
 // BEST HOUR CHART
 const updateBestHourChart=()=>{
