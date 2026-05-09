@@ -620,6 +620,12 @@ body.light-mode .edit-input { background: #fff; color: #000; }
             <div class="ind-lbl">{{ ind.label }}</div>
           </div>
         </div>
+        <div style="margin:12px 0; display:flex; gap:8px; align-items:center;">
+          <label style="color:var(--muted); font-size:0.9rem;">Zona:</label>
+          <select id="zoneSelect" class="sel">
+            <option value="global">Global</option>
+          </select>
+        </div>
         <div class="grid-2" style="margin-top:24px">
           <div class="card">
             <h3 style="margin-bottom:14px;font-size:1.05rem;color:var(--primary)">{{ t('indTitle') }}</h3>
@@ -1032,12 +1038,39 @@ const formatTs=ts=>{if(!ts)return'N/A';const d=new Date(ts);return d.toLocaleTim
 const fetchZones=async()=>{
 try{const r=await fetch(`${API}/api/zones`);zonas.value=await r.json();}
 catch{zonas.value=syntheticZones();}
+populateZoneSelect();
 };
 
 const fetchDash=async()=>{
 try{const r=await fetch(`${API}/api/dashboard`);const d=await r.json();dash.value=d;if(d.zones)zonas.value=d.zones;}
 catch{const z=syntheticZones();zonas.value=z;dash.value={avgAqi:Math.round(z.reduce((s,x)=>s+x.aqi,0)/z.length),avgTraffic:Math.round(z.reduce((s,x)=>s+x.traffic,0)/z.length),alertCount:z.filter(x=>x.no2>55).length,avgGreenScore:Math.round(z.reduce((s,x)=>s+x.greenScore,0)/z.length),alerts:z.filter(x=>x.no2>55).map(x=>({zone:x.name,no2:x.no2,noise:x.noise}))};}
+populateZoneSelect();
 updateDashMap();updateIndicators();
+};
+
+const populateZoneSelect = () => {
+  const sel = document.getElementById('zoneSelect');
+  if(!sel) return;
+  // keep existing selection
+  const cur = sel.value || 'global';
+  // remove existing dynamic options
+  Array.from(sel.querySelectorAll('option')).forEach(o=>{ if(o.value!=='global') o.remove(); });
+  (zonas.value || []).forEach(z=>{
+    const opt = document.createElement('option'); opt.value = z.id; opt.text = z.name;
+    sel.appendChild(opt);
+  });
+  sel.value = cur;
+  sel.onchange = async () => { await loadAirwatchForZone(sel.value); };
+};
+
+const loadAirwatchForZone = async (zoneId) => {
+  try{
+    const url = zoneId && zoneId !== 'global' ? `${API}/api/airwatch?zone=${zoneId}` : `${API}/api/airwatch`;
+    const r = await fetch(url); const d = await r.json();
+    if(d.zones) zonas.value = d.zones;
+    // refresh UI elements
+    updateDashMap(); updateIndicators(); initForecastChart();
+  }catch(e){console.warn('loadAirwatchForZone failed', e);}
 };
 
 const fetchGS=async()=>{
@@ -1168,7 +1201,13 @@ const initForecastChart=async()=>{
 const ctx=document.getElementById('forecast-chart');if(!ctx)return;
 let fcData=[];
 try{const r=await fetch(`${API}/api/airwatch`);const d=await r.json();
-const fcs=d.forecasts||{};const zids=Object.keys(fcs).slice(0,3);
+    // If a zone is selected, request its forecasts
+    const sel = document.getElementById('zoneSelect');
+    if(sel && sel.value && sel.value!=='global'){
+      const r2 = await fetch(`${API}/api/airwatch?zone=${sel.value}`);
+      if(r2.status===200){const d2 = await r2.json(); d.zones = d2.zones; d.forecasts = d2.forecasts;}
+    }
+    const fcs=d.forecasts||{};const zids=Object.keys(fcs).slice(0,3);
 const labels=['1h','2h','3h','4h','5h','6h'];
 const colors=['#00e5ff','#00e676','#ffea00'];
 const datasets=zids.map((zid,i)=>({label:d.zones?.find(z=>z.id===zid)?.name||zid,data:(fcs[zid]||[]).map(f=>f.no2),borderColor:colors[i],backgroundColor:'transparent',borderWidth:3,tension:0.4,pointBackgroundColor:colors[i],pointRadius:4}));

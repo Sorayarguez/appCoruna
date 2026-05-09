@@ -127,8 +127,14 @@ def get_zones():
 
 @app.route("/api/dashboard", methods=["GET"])
 def get_dashboard():
-    zones_r = requests.get("http://localhost:8000/api/zones", timeout=5)
-    zones = zones_r.json() if zones_r.status_code == 200 else synthetic_zone_data()
+    # Support optional filtering by zone id (?zone=zone_id) — 'global' or empty means all
+    zone_filter = request.args.get("zone", None)
+    try:
+        zones = get_zones().get_json() or synthetic_zone_data()
+    except:
+        zones = synthetic_zone_data()
+    if zone_filter and zone_filter != 'global':
+        zones = [z for z in zones if z.get('id') == zone_filter]
     if not zones:
         zones = synthetic_zone_data()
     avg_aqi  = round(sum(z["aqi"] for z in zones) / len(zones), 1)
@@ -144,8 +150,14 @@ def get_dashboard():
 
 @app.route("/api/airwatch", methods=["GET"])
 def get_airwatch():
-    zones_r = requests.get("http://localhost:8000/api/zones", timeout=5)
-    zones = zones_r.json() if zones_r.status_code == 200 else synthetic_zone_data()
+    # optional query param `zone` to return only that zone (or 'global' for all)
+    zone_filter = request.args.get("zone", None)
+    try:
+        zones = get_zones().get_json() or synthetic_zone_data()
+    except:
+        zones = synthetic_zone_data()
+    if zone_filter and zone_filter != 'global':
+        zones = [z for z in zones if z.get('id') == zone_filter]
     # 6-hour forecasts per zone
     forecasts_orion = get_entities("TrafficEnvironmentImpactForecast", 200)
     fc_map = {}
@@ -168,6 +180,9 @@ def get_airwatch():
                     "aqi": round(z["aqi"]*peak, 1), "traffic": int(z["traffic"]*peak)})
         else:
             fc_map[zid].sort(key=lambda x: x["hour"])
+    # If caller requested a single zone, trim forecasts to that zone only
+    if zone_filter and zone_filter != 'global':
+        fc_map = {k: v for k, v in fc_map.items() if k == zone_filter}
     return jsonify({"zones": zones, "forecasts": fc_map})
 
 @app.route("/api/ecoruta", methods=["GET"])
