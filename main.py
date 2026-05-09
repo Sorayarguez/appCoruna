@@ -209,7 +209,7 @@ def get_airwatch():
         zid = z["id"]
         zid_l = zid.lower() if isinstance(zid, str) else zid
         if zid_l not in fc_map:
-            fc_map[zid] = []
+            fc_map[zid_l] = []
             for h in range(1, 7):
                 hour_abs = (datetime.utcnow().hour + h) % 24
                 peak = 1.3 if (7 <= hour_abs <= 9 or 17 <= hour_abs <= 20) else 0.75

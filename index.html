@@ -828,18 +828,19 @@ body.light-mode .edit-input { background: #fff; color: #000; }
 
 
 <script>
-// Ensure Vue is available; if not, attempt a CDN fallback and reload
+function startUrbanPulseApp(){
 if (typeof Vue === 'undefined') {
   console.error('Vue not found, loading fallback...');
   const s = document.createElement('script');
   s.src = 'https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js';
   s.crossOrigin = 'anonymous';
-  s.onload = () => { console.info('Fallback Vue loaded, reloading page'); window.location.reload(); };
-  s.onerror = () => { console.error('Failed to load fallback Vue. App will not mount.'); };
+  s.onload = () => startUrbanPulseApp();
+  s.onerror = () => { console.error('Failed to load Vue fallback.'); };
   document.head.appendChild(s);
+  return;
 }
 const {createApp,ref,onMounted,watch}=Vue;
-const API='http://localhost:8000';
+const API = window.location.origin;
 createApp({setup(){
 const savedLang = localStorage.getItem('urbs-lang');
 const savedTheme = localStorage.getItem('urbs-theme');
@@ -1470,6 +1471,9 @@ setInterval(fetchDash,30000);
 
 return{isEditingProfile, profileAvatarZoomed, tab,zonas,dash,gsRanked,bestZone,rutas,bestHours,ecoOrigen,ecoDest,chatOpen,chatIn,chatMsgs,indicators,calcRuta,sendChat,formatTs,tMode,getRouteStats, viewMode, lang, isLight, t, profileName, editingName, editName, profileAvatar, triggerAvatarUpload, handleAvatarUpload, heroPhrase, mascotAnimate};
 }}).mount('#app');
+}
+
+startUrbanPulseApp();
 </script>
 </body>
 </html>
