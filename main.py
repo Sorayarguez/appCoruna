@@ -1,5 +1,10 @@
-from flask import Flask, request, jsonify
-from flask_cors import CORS
+from flask import Flask, request, jsonify, send_from_directory
+try:
+    from flask_cors import CORS
+except Exception:
+    # Allow running locally even if flask_cors is not installed
+    def CORS(app):
+        print('Warning: flask_cors not installed; CORS disabled')
 from datetime import datetime, timedelta
 import os
 import requests, math, heapq, random
@@ -123,12 +128,45 @@ def get_zones():
     else:
         zones = synthetic_zone_data()
 
+    # sanitize and normalize coordinates and ids
+    for z in zones:
+        # ensure id is a string
+        if 'id' in z and isinstance(z['id'], str):
+            z['id'] = z['id']
+        # coerce numeric lat/lon and fix swapped values if necessary
+        try:
+            lat = float(z.get('lat', 0))
+            lon = float(z.get('lon', 0))
+        except Exception:
+            # fallback to metadata if available
+            meta = next((m for m in ZONES_META if m['id'].lower() == str(z.get('id','')).lower()), None)
+            if meta:
+                lat = meta['lat']; lon = meta['lon']
+            else:
+                lat = 43.362; lon = -8.411
+        # If values look swapped (lat out of plausible range and lon looks like lat), swap them
+        lat_ok = 40.0 <= lat <= 46.0
+        lon_ok = -25.0 <= lon <= 5.0
+        if not lat_ok and lon_ok:
+            lat, lon = lon, lat
+        # second check: both outside but reversed ranges
+        if not lat_ok and not lon_ok:
+            if -25.0 <= lat <= 5.0 and 40.0 <= lon <= 46.0:
+                lat, lon = lon, lat
+        z['lat'] = round(float(lat), 6)
+        z['lon'] = round(float(lon), 6)
     return jsonify(zones)
 
 @app.route("/api/dashboard", methods=["GET"])
 def get_dashboard():
-    zones_r = requests.get("http://localhost:8000/api/zones", timeout=5)
-    zones = zones_r.json() if zones_r.status_code == 200 else synthetic_zone_data()
+    # Support optional filtering by zone id (?zone=zone_id) — 'global' or empty means all
+    zone_filter = request.args.get("zone", None)
+    try:
+        zones = get_zones().get_json() or synthetic_zone_data()
+    except:
+        zones = synthetic_zone_data()
+    if zone_filter and zone_filter != 'global':
+        zones = [z for z in zones if z.get('id') == zone_filter]
     if not zones:
         zones = synthetic_zone_data()
     avg_aqi  = round(sum(z["aqi"] for z in zones) / len(zones), 1)
@@ -144,31 +182,54 @@ def get_dashboard():
 
 @app.route("/api/airwatch", methods=["GET"])
 def get_airwatch():
-    zones_r = requests.get("http://localhost:8000/api/zones", timeout=5)
-    zones = zones_r.json() if zones_r.status_code == 200 else synthetic_zone_data()
+    # optional query param `zone` to return only that zone (or 'global' for all)
+    zone_filter = request.args.get("zone", None)
+    try:
+        zones = get_zones().get_json() or synthetic_zone_data()
+    except:
+        zones = synthetic_zone_data()
+    if zone_filter and zone_filter != 'global':
+        zones = [z for z in zones if z.get('id') == zone_filter]
     # 6-hour forecasts per zone
     forecasts_orion = get_entities("TrafficEnvironmentImpactForecast", 200)
     fc_map = {}
     for fc in forecasts_orion:
         ref = fc.get("refTrafficFlowObserved", {}).get("value", "")
         zid = ref.split(":")[-1] if ref else None
+        zid_l = zid.lower() if zid else None
         h   = val(fc, "forecastHour") or 1
         if zid:
-            if zid not in fc_map: fc_map[zid] = []
-            fc_map[zid].append({"hour": int(h), "no2": val(fc, "NO2Concentration"), "aqi": val(fc, "airQualityIndex"), "traffic": val(fc, "trafficIntensity")})
+            key = zid_l
+            if key not in fc_map: fc_map[key] = []
+            fc_map[key].append({"hour": int(h), "no2": val(fc, "NO2Concentration"), "aqi": val(fc, "airQualityIndex"), "traffic": val(fc, "trafficIntensity")})
     # If no forecasts, generate synthetic
+    # Build lookup map for zones by lowercase id
+    zone_lookup = { (z.get('id') or '').lower(): z for z in zones }
     for z in zones:
         zid = z["id"]
-        if zid not in fc_map:
-            fc_map[zid] = []
+        zid_l = zid.lower() if isinstance(zid, str) else zid
+        if zid_l not in fc_map:
+            fc_map[zid_l] = []
             for h in range(1, 7):
                 hour_abs = (datetime.utcnow().hour + h) % 24
                 peak = 1.3 if (7 <= hour_abs <= 9 or 17 <= hour_abs <= 20) else 0.75
-                fc_map[zid].append({"hour": h, "no2": round(z["no2"]*peak*random.uniform(0.9,1.1),1),
+                fc_map[zid_l].append({"hour": h, "no2": round(z["no2"]*peak*random.uniform(0.9,1.1),1),
                     "aqi": round(z["aqi"]*peak, 1), "traffic": int(z["traffic"]*peak)})
         else:
-            fc_map[zid].sort(key=lambda x: x["hour"])
-    return jsonify({"zones": zones, "forecasts": fc_map})
+            fc_map[zid_l].sort(key=lambda x: x["hour"])
+    # Prepare return forecasts mapping using original zone ids when possible
+    out_fc = {}
+    for zl, arr in fc_map.items():
+        orig = zone_lookup.get(zl, {}).get('id') or zl
+        out_fc[orig] = arr
+
+    # If caller requested a single zone, filter zones and forecasts (case-insensitive)
+    if zone_filter and zone_filter != 'global':
+        zf = zone_filter.lower()
+        zones = [z for z in zones if (z.get('id') or '').lower() == zf]
+        out_fc = {k: v for k, v in out_fc.items() if (k or '').lower() == zf}
+
+    return jsonify({"zones": zones, "forecasts": out_fc})
 
 @app.route("/api/ecoruta", methods=["GET"])
 def get_ecoruta():
@@ -377,6 +438,19 @@ def activate_ecozone(zone_id):
 @app.route("/api/ecozones/<zone_id>/deactivate", methods=["POST"])
 def deactivate_ecozone(zone_id):
     return jsonify({"status":"success","message":f"ZBE desactivada en {zone_id}."})
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def serve_frontend(path):
+    # Serve index.html at root and static files from the workspace
+    if path == '' or path == 'index.html':
+        return send_from_directory('.', 'index.html')
+    # First try to serve file from workspace root, else from ./static
+    try:
+        return send_from_directory('.', path)
+    except Exception:
+        return send_from_directory('static', path)
+
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8000, debug=True)
+    port = int(os.environ.get('PORT', 8000))
+    app.run(host="0.0.0.0", port=port, debug=True)

@@ -6,3 +6,4 @@ geopandas
 scikit-learn
 faker
 paho-mqtt
+Shapely
