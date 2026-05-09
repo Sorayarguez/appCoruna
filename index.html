@@ -643,6 +643,12 @@ body.light-mode .edit-input { background: #fff; color: #000; }
         </div>
         <div class="card">
           <h3 style="margin-bottom:14px;font-size:1.05rem;color:var(--primary)">{{ t('predTitle') }}</h3>
+          <div style="margin-bottom:12px; display:flex; gap:8px; align-items:center;">
+            <label style="color:var(--muted); font-size:0.85rem;">Zona prediccion:</label>
+            <select id="forecastZoneSelect" class="sel" style="max-width:280px;">
+              <option value="all">Todas las zonas</option>
+            </select>
+          </div>
           <div class="chart-box" style="height:300px;"><canvas id="forecast-chart"></canvas></div>
         </div>
       </div>
@@ -1074,6 +1080,22 @@ const populateZoneSelect = () => {
   });
   sel.value = cur;
   sel.onchange = async () => { await loadAirwatchForZone(sel.value); };
+  populateForecastZoneSelect();
+};
+
+const populateForecastZoneSelect = () => {
+  const sel = document.getElementById('forecastZoneSelect');
+  if(!sel) return;
+  const cur = sel.value || 'all';
+  Array.from(sel.querySelectorAll('option')).forEach(o=>{ if(o.value!=='all') o.remove(); });
+  (zonas.value || []).forEach(z=>{
+    const opt = document.createElement('option');
+    opt.value = z.id;
+    opt.text = z.name;
+    sel.appendChild(opt);
+  });
+  sel.value = (Array.from(sel.options).some(o => o.value === cur) ? cur : 'all');
+  sel.onchange = () => { initForecastChart(); };
 };
 
 const normalizeZones = () => {
@@ -1097,6 +1119,7 @@ const loadAirwatchForZone = async (zoneId) => {
     const r = await fetch(url); const d = await r.json();
     if(d.zones) zonas.value = d.zones;
     // refresh UI elements
+    populateForecastZoneSelect();
     updateDashMap(); updateIndicators(); initForecastChart();
   }catch(e){console.warn('loadAirwatchForZone failed', e);}
 };
@@ -1232,9 +1255,12 @@ let fcData=[];
   const sel = document.getElementById('zoneSelect');
     const url = (sel && sel.value && sel.value!=='global') ? `${API}/api/airwatch?zone=${sel.value}` : `${API}/api/airwatch`;
     const r = await fetch(url); const d = await r.json();
-    const fcs=d.forecasts||{};const zids=Object.keys(fcs).slice(0,3);
+    const fcs=d.forecasts||{};
+    const allZoneIds = Object.keys(fcs);
+    const forecastSel = document.getElementById('forecastZoneSelect');
+    const chosenZone = forecastSel ? forecastSel.value : 'all';
+    const zids = chosenZone && chosenZone !== 'all' ? allZoneIds.filter(zid => zid === chosenZone) : allZoneIds;
 const labels=['1h','2h','3h','4h','5h','6h'];
-const colors=['#00e5ff','#00e676','#ffea00'];
 const datasets = zids.map((zid,i)=>{
   const arr = (fcs[zid]||[]);
   // build an array of length equal to labels (6), fill with null where missing
@@ -1242,13 +1268,20 @@ const datasets = zids.map((zid,i)=>{
     const found = arr.find(f => Number(f.hour) === idx+1);
     return found ? Number(found.no2) : null;
   });
-  return {label: d.zones?.find(z=>z.id===zid)?.name||zid, data, borderColor:colors[i%colors.length], backgroundColor:'transparent', borderWidth:3, tension:0.4, pointBackgroundColor:colors[i%colors.length], pointRadius:4};
+  const color = `hsl(${Math.round((i * 360) / Math.max(1, zids.length))}, 85%, 58%)`;
+  const zoneName = d.zones?.find(z=>z.id===zid)?.name || (zonas.value || []).find(z => z.id === zid)?.name || zid;
+  return {label: zoneName, data, borderColor:color, backgroundColor:'transparent', borderWidth:3, tension:0.35, pointBackgroundColor:color, pointRadius:3};
 });
 if(forecastChart)forecastChart.destroy();
-forecastChart=new Chart(ctx,{type:'line',data:{labels,datasets},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#94a3b8'}}},scales:{x:{ticks:{color:'#94a3b8'},grid:{color:'rgba(255,255,255,.05)'}},y:{title:{display:true,text:'NO₂ (µg/m³)',color:'#94a3b8'},ticks:{color:'#94a3b8'},grid:{color:'rgba(255,255,255,.05)'}}}}});
-}catch(e){const z=syntheticZones().slice(0,3);const labels=['1h','2h','3h','4h','5h','6h'];
+forecastChart=new Chart(ctx,{type:'line',data:{labels,datasets},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#94a3b8'},onClick:()=>{}},tooltip:{mode:'nearest',intersect:false}},scales:{x:{ticks:{color:'#94a3b8'},grid:{color:'rgba(255,255,255,.05)'}},y:{title:{display:true,text:'NO₂ (µg/m³)',color:'#94a3b8'},ticks:{color:'#94a3b8'},grid:{color:'rgba(255,255,255,.05)'}}}}});
+}catch(e){
+const labels=['1h','2h','3h','4h','5h','6h'];
+const zAll=syntheticZones();
+const forecastSel = document.getElementById('forecastZoneSelect');
+const chosenZone = forecastSel ? forecastSel.value : 'all';
+const z = chosenZone && chosenZone !== 'all' ? zAll.filter(x => x.id === chosenZone) : zAll;
 if(forecastChart)forecastChart.destroy();
-forecastChart=new Chart(ctx,{type:'line',data:{labels,datasets:z.map((x,i)=>({label:x.name,data:[x.no2*.9,x.no2*1.1,x.no2*1.3,x.no2*1.2,x.no2*1.0,x.no2*.8],borderColor:['#00e5ff','#00e676','#ffea00'][i],backgroundColor:'transparent',borderWidth:3,tension:0.4}))},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#94a3b8'}}},scales:{x:{ticks:{color:'#94a3b8'},grid:{color:'rgba(255,255,255,.05)'}},y:{ticks:{color:'#94a3b8'},grid:{color:'rgba(255,255,255,.05)'}}}}}); }
+forecastChart=new Chart(ctx,{type:'line',data:{labels,datasets:z.map((x,i)=>({label:x.name,data:[x.no2*.9,x.no2*1.1,x.no2*1.3,x.no2*1.2,x.no2*1.0,x.no2*.8],borderColor:`hsl(${Math.round((i * 360) / Math.max(1, z.length))}, 85%, 58%)`,backgroundColor:'transparent',borderWidth:3,tension:0.35}))},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#94a3b8'},onClick:()=>{}}},scales:{x:{ticks:{color:'#94a3b8'},grid:{color:'rgba(255,255,255,.05)'}},y:{ticks:{color:'#94a3b8'},grid:{color:'rgba(255,255,255,.05)'}}}}}); }
 };
 
 // THREE.JS 3D (aggregated bars per zone)
