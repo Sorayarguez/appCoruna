@@ -1,5 +1,7 @@
 Title: Fix AirWatch: zone filtering, normalize coords, meaningful 3D view
 
+Status: CLOSED (2026-05-09)
+
 Description:
 We need to fix and improve the AirWatch section:
 
@@ -13,10 +15,11 @@ Implementation notes:
 - Frontend: added `#zoneSelect` dropdown and logic to request `/api/airwatch?zone=` and refresh indicators and forecast chart.
 - Added `Shapely` to `requirements.txt` for future polygon/point-in-polygon filtering if needed.
 
-Next steps (remaining):
-- Normalize zone IDs across seeders (`seed_data.py`, `seed_docker.py`) if mismatches exist.
-- Rework the 3D view to use `THREE.InstancedMesh` bars with a clear legend and aggregated-by-zone default view.
-- Update tests and QA steps.
+Resolution summary:
+- Added zone/global filtering in `/api/dashboard` and `/api/airwatch`.
+- Fixed map coordinate handling and server-side lat/lon sanitization.
+- Implemented forecast filtering and full-zone 6h prediction selector in frontend.
+- Replaced ambiguous 3D view with informative aggregated bars by zone.
 
 Labels: enhancement, bug
 Assignees: 
