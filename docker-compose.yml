@@ -71,13 +71,6 @@ services:
     depends_on:
       - cratedb
 
-  ollama:
-    image: ollama/ollama:latest
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama-data:/root/.ollama
-
   backend:
     image: python:3.11-slim
     ports:
@@ -98,8 +91,8 @@ services:
       - backend
     volumes:
       - ./index.html:/usr/share/nginx/html/index.html
+      - ./mascot.png:/usr/share/nginx/html/mascot.png
       - ./nginx.conf:/etc/nginx/conf.d/default.conf
 
 volumes:
   mongo-data:
-  ollama-data:

@@ -1,13 +1,14 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from datetime import datetime, timedelta
+import os
 import requests, math, heapq, random
 
 app = Flask(__name__)
 CORS(app)
 
 ORION_URL = "http://orion:1026/v2"
-OLLAMA_URL = "http://ollama:11434/api/generate"
+OLLAMA_URL = os.environ.get("OLLAMA_URL", "").strip()
 ORION_HEADERS = {"fiware-service": "urbs", "Accept": "application/json"}
 
 ZONES_META = [
@@ -296,27 +297,61 @@ def get_greenscore():
 
 @app.route("/api/chat", methods=["POST"])
 def chat_urbs():
-    msg = (request.json or {}).get("message", "")
-    prompt = (f"Eres URBS, el asistente virtual de movilidad y medio ambiente de A Coruña. "
-              f"Responde de forma concisa y amigable en español. "
-              f"Usuario: '{msg}'")
-    try:
-        res = requests.post(OLLAMA_URL, json={"model": "llama3", "prompt": prompt, "stream": False}, timeout=15)
-        if res.status_code == 200:
-            return jsonify({"response": res.json().get("response", "Sin respuesta")})
-    except:
-        pass
+    data = request.json or {}
+    msg = data.get("message", "")
+    mode = data.get("mode", "ciudadano")
+    lang = data.get("lang", "es")
+
+    if mode == "alcalde":
+        prompt = (f"Eres URBS, un sistema avanzado de análisis urbano y políticas públicas de A Coruña. "
+                  f"Responde de forma técnica, orientada a macro decisiones, coste-beneficio, predicciones ML y alertas de política pública en {'Inglés' if lang == 'en' else 'Español'}. "
+                  f"Usuario: '{msg}'")
+    else:
+        prompt = (f"Eres URBS, el asistente virtual de movilidad y medio ambiente de A Coruña. "
+                  f"Responde con humor urbano. Da consejos personales y accionables sobre cómo afecta al ciudadano en {'Inglés' if lang == 'en' else 'Español'}. "
+                  f"Usuario: '{msg}'")
+    if OLLAMA_URL:
+        try:
+            res = requests.post(OLLAMA_URL, json={"model": "llama3", "prompt": prompt, "stream": False}, timeout=15)
+            if res.status_code == 200:
+                return jsonify({"response": res.json().get("response", "Sin respuesta")})
+        except:
+            pass
     # Fallback smart responses
     msg_l = msg.lower()
     if "riazor" in msg_l or "playa" in msg_l:
-        return jsonify({"response": "Riazor tiene actualmente calidad de aire buena (AQI ~80). Es una de las mejores zonas para pasear en bici o a pie. ¡Recomendada!"})
+        if mode == "alcalde": return jsonify({"response": "Riazor presenta AQI ~80. Recomendación: mantener monitorización, no se requieren intervenciones en el tráfico a corto plazo."})
+        else: return jsonify({"response": "Riazor está genial (AQI ~80). Coge la bici o vete a dar un paseo que el aire está de lujo hoy."})
     if "tráfico" in msg_l or "trafico" in msg_l:
-        return jsonify({"response": "El mayor tráfico en A Coruña ahora mismo está en Cuatro Caminos y el Centro. Evítalos entre 8-9h y 18-20h."})
+        if mode == "alcalde": return jsonify({"response": "Saturación detectada en Cuatro Caminos y el Centro. Se sugiere activar protocolo de restricción de tráfico en Centro antes de las 14h para reducir impacto."})
+        else: return jsonify({"response": "Cuatro Caminos y el Centro están a tope. Si vas por ahí vas a tragar humo, evítalos entre las 8-9h y 18-20h, te lo digo yo que llevo horas mirando."})
     if "contamina" in msg_l or "no2" in msg_l or "aire" in msg_l:
-        return jsonify({"response": "Las zonas con mejor calidad del aire son Monte Alto, Mesoiro y Orzán. Las más contaminadas son Cuatro Caminos y As Xubias."})
+        if mode == "alcalde": return jsonify({"response": "Las métricas indican picos de contaminación en Cuatro Caminos y As Xubias. Mesoiro mantiene niveles óptimos. Analizar posible expansión de ZBE."})
+        else: return jsonify({"response": "Mesoiro gana otra vez, ya van 4 días seguidos, alguien avise a Orzán. Sin embargo, Cuatro Caminos está fatal hoy, ni te acerques."})
     if "bici" in msg_l or "ciclista" in msg_l:
-        return jsonify({"response": "Te recomiendo la ruta Orzán → Riazor → Monte Alto. Tiene bajo nivel de tráfico y buena calidad del aire. Mejor ir antes de las 9h o después de las 20h."})
-    return jsonify({"response": f"Hola, soy URBS. Monitorizamos {len(ZONES_META)} zonas de A Coruña en tiempo real. ¿Te ayudo con rutas, calidad del aire o niveles de tráfico?"})
+        if mode == "alcalde": return jsonify({"response": "El eje Orzán-Riazor-Monte Alto presenta viabilidad alta para movilidad activa. Fomentar uso del carril bici en esta zona tiene alto beneficio (coste bajo, impacto ambiental positivo)."})
+        else: return jsonify({"response": "Coge la bici y tira por Orzán → Riazor → Monte Alto. ¡Aprovecha que el aire está limpio y te ahorras un buen atasco!"})
+
+    if mode == "alcalde": return jsonify({"response": "Sistema URBS operativo. Analizando métricas de política pública y sostenibilidad. ¿Qué zona requiere evaluación?"})
+    else:
+        import random
+        if lang == "en":
+            respuestas = [
+                "Hello! I am URBS. Watch out, the City Center is a mess today, trust me, I've been monitoring for 3 hours.",
+                "Hey there! URBS here. The breeze in Riazor is amazing today. Do you want me to trace a route?",
+                "What's up! Monitoring A Coruña... by the way, if you're driving through Cuatro Caminos, arm yourself with patience.",
+                "Hello, hello! If you're looking for the best place for a walk, check the GreenScore, you won't regret it.",
+                "I'm URBS. Today the air smells like the sea and like you're running late. Where are you heading?"
+            ]
+        else:
+            respuestas = [
+                "¡Hola! Soy URBS. Ojo, el Centro está fatal hoy, te lo digo yo que llevo 3 horas monitorizando.",
+                "¡Epa! Aquí URBS. La brisa en Riazor hoy es de primera. ¿Quieres que te trace una ruta?",
+                "¡Qué pasa! Monitorizando A Coruña estoy... por cierto, si vas en coche por Cuatro Caminos, ármate de paciencia.",
+                "¡Hola, hola! Si buscas el mejor sitio para pasear, échale un ojo al GreenScore, no te arrepentirás.",
+                "Soy URBS. Hoy el ambiente huele a mar y a que llegas tarde. ¿A dónde vas?"
+            ]
+        return jsonify({"response": random.choice(respuestas)})
 
 @app.route("/api/explain/<zone_id>", methods=["GET"])
 def explain_zone(zone_id):
@@ -326,12 +361,13 @@ def explain_zone(zone_id):
     traffic = val(flow, "intensity") if flow else "desconocida"
     prompt = (f"En la zona {zone_id} de A Coruña el NO2 es {no2} µg/m³ y el tráfico {traffic} veh/h. "
               f"Explica en 2 frases la correlación entre tráfico y contaminación.")
-    try:
-        res = requests.post(OLLAMA_URL, json={"model":"llama3","prompt":prompt,"stream":False}, timeout=12)
-        if res.status_code == 200:
-            return jsonify({"explanation": res.json().get("response","")})
-    except:
-        pass
+    if OLLAMA_URL:
+        try:
+            res = requests.post(OLLAMA_URL, json={"model":"llama3","prompt":prompt,"stream":False}, timeout=12)
+            if res.status_code == 200:
+                return jsonify({"explanation": res.json().get("response","")})
+        except:
+            pass
     return jsonify({"explanation": f"Con {traffic} veh/h, el NO₂ de {no2} µg/m³ en {zone_id} supera el umbral recomendado. Se prevén picos adicionales en hora punta."})
 
 @app.route("/api/ecozones/<zone_id>/activate", methods=["POST"])

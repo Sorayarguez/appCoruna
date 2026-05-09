@@ -7,7 +7,7 @@ URBS es una aplicación integral basada en FIWARE para la monitorización ambien
 El sistema está compuesto por 3 módulos principales integrados:
 
 1. **GreenRoute**: Cálculo de rutas saludables basado en el índice de calidad del aire (NO2 y PM2.5).
-2. **UrbanPulse**: Panel de control con gráficas correlacionadas de tráfico/contaminación y explicaciones generadas en lenguaje natural mediante un LLM local (Ollama).
+2. **UrbanPulse**: Panel de control con gráficas correlacionadas de tráfico/contaminación y explicaciones generadas con fallback local cuando no hay servicio de IA disponible.
 3. **EcoZones**: Gestión dinámica de Zonas de Bajas Emisiones (ZBE) mediante un sistema de alertas.
 
 ## 💾 Smart Data Models (NGSI v2)
@@ -21,7 +21,7 @@ Se implementan 4 modelos de datos clave, enlazados mediante referencias (Relatio
 
 ## 🚀 Despliegue (Paso a Paso)
 
-Todo el proyecto está dockerizado para facilitar el despliegue de todos los componentes FIWARE (Orion, IoT Agent, QuantumLeap, CrateDB), Grafana, Ollama y el Backend/Frontend personalizado.
+Todo el proyecto está dockerizado para facilitar el despliegue de todos los componentes FIWARE (Orion, IoT Agent, QuantumLeap, CrateDB), Grafana y el Backend/Frontend personalizado.
 
 1. **Clonar el repositorio y ubicarse en la carpeta**
    ```bash
@@ -34,24 +34,18 @@ Todo el proyecto está dockerizado para facilitar el despliegue de todos los com
    ```
    *Nota: La primera vez descargará bastantes imágenes oficiales de FIWARE y BDs.*
 
-3. **Descargar el modelo LLM para Ollama (Opcional pero recomendado)**
-   Para que las explicaciones generativas funcionen, ejecuta:
-   ```bash
-   docker exec -it appcoruna-ollama-1 ollama run llama3
-   ```
-
-4. **Instalar dependencias de Python** (para lanzar los simuladores localmente):
+3. **Instalar dependencias de Python** (para lanzar los simuladores localmente):
    ```bash
    pip install -r requirements.txt
    ```
 
-5. **Iniciar el Simulador IoT (Ingesta de datos)**
+4. **Iniciar el Simulador IoT (Ingesta de datos)**
    El simulador registrará los servicios y dispositivos, y comenzará a inyectar datos sintéticos para A Coruña mediante MQTT (tráfico) y HTTP (ambiente).
    ```bash
    python simulator.py
    ```
 
-6. **Iniciar el modelo predictivo ML (En otra terminal)**
+5. **Iniciar el modelo predictivo ML (En otra terminal)**
    Este script lee el estado actual de Orion y sube nuevas entidades de tipo "Forecast" simulando proyecciones futuras.
    ```bash
    python ml_predictor.py
@@ -68,4 +62,4 @@ Todo el proyecto está dockerizado para facilitar el despliegue de todos los com
 - **Backend**: FastAPI por su extrema velocidad y simplicidad para mapear rutas RESTful.
 - **Frontend**: Vanilla HTML5/JS/CSS3 usando CSS Grid, variables CSS, glassmorphism, y sin frameworks bloqueantes para una PWA ligera y visualmente impactante.
 - **Visualización 3D**: Uso de `THREE.Points` para renderizar volumétricamente una simulación de partículas de polución.
-- **IA Generativa**: Se introduce Ollama ejecutándose de manera local, garantizando la privacidad de los datos al generar explicaciones a partir del contexto urbano.
+- **IA Generativa**: El backend usa respuestas locales y solo consume un servicio externo de IA si se configura explícitamente mediante `OLLAMA_URL`.
