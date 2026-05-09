@@ -393,6 +393,9 @@ def get_ecoruta():
             if p2a and p2b:
                 path2 = p2a + p2b[1:]
                 cost2 = c2a + c2b
+            elif mid:
+                path2 = [origin_id, mid["id"], dest_id]
+                cost2 = salubrity_cost(mid)
 
         # Route 3: fastest (fewest hops, ignores pollution)
         graph3 = {z["id"]: [] for z in zones}
@@ -415,6 +418,16 @@ def get_ecoruta():
                 if nb not in visited3:
                     heapq.heappush(pq3, (c+ec, nb, path+[nb]))
 
+        if not path3:
+            path3 = [origin_id, dest_id]
+            cost3 = dist(zone_map[origin_id], zone_map[dest_id])
+
+        route_palette = {
+            "Ruta EcoÓptima": "#22c55e",
+            "Ruta Alternativa": "#f59e0b",
+            "Ruta Rápida": "#3b82f6",
+        }
+
         def build_route(path, name, label):
             if not path: return None
             nodes = [zone_map[z] for z in path if z in zone_map]
@@ -426,7 +439,7 @@ def get_ecoruta():
                 transfers = max(0, sum(1 for n in nodes[1:-1] if n["id"] in bus_core_ids) - 1)
                 time_min += transfers * 5 + max(0, len(nodes) - 2) * 1
             co2g = round(dist_km * profile["co2_rate"], 1)
-            color = route_color(avg_cost)
+            color = route_palette.get(name, route_color(avg_cost))
             return {
                 "name": name, "label": label, "mode": mode, "color": color,
                 "speedKmh": profile["speed"], "co2Rate": profile["co2_rate"],

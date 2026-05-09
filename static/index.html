@@ -17,6 +17,7 @@
     <nav class="sidebar">
         <div class="logo">
             <h2>appCoruña</h2>
+            <button id="theme-toggle" class="theme-toggle" type="button">Modo claro</button>
         </div>
         <ul class="nav-links">
             <li class="active" data-target="dashboard">Dashboard</li>
@@ -87,9 +88,23 @@
             </header>
             <div class="ecoruta-body">
                 <div class="route-controls glass">
+                    <label for="route-mode">Modo de desplazamiento</label>
+                    <select id="route-mode">
+                        <option value="walk">A pie</option>
+                        <option value="bike">Bici</option>
+                        <option value="bus">Bus</option>
+                        <option value="car">Coche</option>
+                    </select>
+                    <label for="route-origin">Origen</label>
                     <input type="text" id="route-origin" placeholder="Origen (ej. Calle Real)">
+                    <label for="route-dest">Destino</label>
                     <input type="text" id="route-dest" placeholder="Destino (ej. Riazor)">
                     <button id="btn-calc-route">Calcular Ruta</button>
+                    <div class="route-legend">
+                        <span><i class="legend-line eco"></i>Ruta EcoÓptima</span>
+                        <span><i class="legend-line alt"></i>Ruta Alternativa</span>
+                        <span><i class="legend-line fast"></i>Ruta Rápida</span>
+                    </div>
                     <div id="route-comparative"></div>
                 </div>
                 <div class="map-container glass" id="ecoruta-map"></div>

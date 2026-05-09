@@ -1,9 +1,48 @@
-mermaid.initialize({ startOnLoad: true, theme: 'dark' });
+const THEME_KEY = 'appcoruna-theme';
+const LIGHT_THEME = 'light';
+const DARK_THEME = 'dark';
+
+function setMermaidTheme(theme) {
+    mermaid.initialize({ startOnLoad: true, theme: theme === LIGHT_THEME ? 'default' : 'dark' });
+}
+
+function applyTheme(theme) {
+    document.body.classList.toggle('light-mode', theme === LIGHT_THEME);
+    document.body.classList.toggle('dark-mode', theme !== LIGHT_THEME);
+    const toggle = document.getElementById('theme-toggle');
+    if (toggle) {
+        toggle.textContent = theme === LIGHT_THEME ? 'Modo oscuro' : 'Modo claro';
+    }
+    setMermaidTheme(theme);
+}
+
+const savedTheme = localStorage.getItem(THEME_KEY) || DARK_THEME;
+applyTheme(savedTheme === LIGHT_THEME ? LIGHT_THEME : DARK_THEME);
 
 // Global State
 const state = {
-    corunaCoords: [43.3623, -8.4115]
+    corunaCoords: [43.3623, -8.4115],
+    theme: savedTheme === LIGHT_THEME ? LIGHT_THEME : DARK_THEME,
+    zones: [],
+    routes: [],
+    routeLayers: null,
+    ecorutaChart: null,
+    maps: {}
 };
+
+document.getElementById('theme-toggle').addEventListener('click', () => {
+    state.theme = state.theme === LIGHT_THEME ? DARK_THEME : LIGHT_THEME;
+    localStorage.setItem(THEME_KEY, state.theme);
+    applyTheme(state.theme);
+    Object.values(state.maps).forEach(map => {
+        map.eachLayer(layer => {
+            if (layer instanceof L.TileLayer) {
+                layer.setUrl(getTileUrl());
+            }
+        });
+    });
+    Object.values(state.maps).forEach(map => map && map.invalidateSize());
+});
 
 // Tab switching
 document.querySelectorAll('.nav-links li').forEach(li => {
@@ -27,23 +66,32 @@ const mapOptions = {
     attributionControl: false
 };
 
-const tileLayer = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+const tileLayer = 'https://{s}.basemaps.cartocdn.com/{theme}/{z}/{x}/{y}{r}.png';
+
+function getTileUrl() {
+    return state.theme === LIGHT_THEME
+        ? tileLayer.replace('{theme}', 'light_all')
+        : tileLayer.replace('{theme}', 'dark_all');
+}
+
+function buildMap(mapId) {
+    const map = L.map(mapId, mapOptions);
+    L.tileLayer(getTileUrl()).addTo(map);
+    state.maps[mapId] = map;
+    return map;
+}
 
 // Dashboard Map
-const dashMap = L.map('dashboard-map', mapOptions);
-L.tileLayer(tileLayer).addTo(dashMap);
+const dashMap = buildMap('dashboard-map');
 
 // AirWatch Map (Heatmap)
-const airMap = L.map('airwatch-map', mapOptions);
-L.tileLayer(tileLayer).addTo(airMap);
+const airMap = buildMap('airwatch-map');
 
 // EcoRuta Map
-const ecoMap = L.map('ecoruta-map', mapOptions);
-L.tileLayer(tileLayer).addTo(ecoMap);
+const ecoMap = buildMap('ecoruta-map');
 
 // GreenScore Map
-const greenMap = L.map('greenscore-map', mapOptions);
-L.tileLayer(tileLayer).addTo(greenMap);
+const greenMap = buildMap('greenscore-map');
 
 // Add random markers to dashMap for demo
 const zones = [
@@ -57,6 +105,176 @@ zones.forEach(z => {
     L.circleMarker(z.coords, {
         radius: 8, fillColor: color, color: "#fff", weight: 1, opacity: 1, fillOpacity: 0.8
     }).addTo(dashMap).bindPopup(`<b>${z.name}</b><br>Estado: ${z.state}`);
+});
+
+const routePalette = {
+    'ruta ecoóptima': '#22c55e',
+    'ruta ecooptima': '#22c55e',
+    'ruta alternativa': '#f59e0b',
+    'ruta rápida': '#3b82f6',
+    'ruta rapida': '#3b82f6'
+};
+
+function normalizeText(value) {
+    return (value || '').toString().trim().toLowerCase();
+}
+
+function resolveZone(value) {
+    const normalized = normalizeText(value);
+    if (!normalized) {
+        return null;
+    }
+    return state.zones.find(zone => {
+        const id = normalizeText(zone.id);
+        const name = normalizeText(zone.name);
+        return id === normalized || name === normalized || name.includes(normalized) || id.includes(normalized);
+    }) || null;
+}
+
+function clearRouteLayers() {
+    if (state.routeLayers) {
+        state.routeLayers.clearLayers();
+    } else {
+        state.routeLayers = L.layerGroup().addTo(ecoMap);
+    }
+}
+
+function renderRouteResults(routes, originZone, destZone) {
+    const container = document.getElementById('route-comparative');
+    if (!routes.length) {
+        container.innerHTML = '<p>No se encontraron rutas para esos valores.</p>';
+        return;
+    }
+
+    container.innerHTML = routes.map(route => `
+        <article class="route-card glass" style="border-left: 4px solid ${route.color}; padding: 0.9rem; margin-top: 0.75rem;">
+            <div style="display:flex;justify-content:space-between;gap:1rem;align-items:center;">
+                <strong>${route.name}</strong>
+                <span style="color:${route.color};font-weight:700;">${route.label}</span>
+            </div>
+            <p style="margin-top:0.4rem; color: var(--muted-color);">${originZone.name} → ${destZone.name}</p>
+            <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0.4rem;margin-top:0.75rem;">
+                <span>Distancia: ${route.distKm} km</span>
+                <span>Tiempo: ${route.timeMin} min</span>
+                <span>CO₂: ${route.co2g} g</span>
+                <span>Índice: ${route.pollutionIndex}</span>
+            </div>
+        </article>
+    `).join('');
+}
+
+function renderBestHoursChart(bestHours) {
+    const ctx = document.getElementById('ecoruta-time').getContext('2d');
+    if (state.ecorutaChart) {
+        state.ecorutaChart.destroy();
+    }
+    state.ecorutaChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: bestHours.map(slot => slot.hour),
+            datasets: [{
+                label: 'NO2 estimado',
+                data: bestHours.map(slot => slot.aqi),
+                borderColor: '#22c55e',
+                backgroundColor: 'rgba(34, 197, 94, 0.18)',
+                tension: 0.35,
+                fill: true
+            }, {
+                label: 'Tráfico',
+                data: bestHours.map(slot => slot.traffic),
+                borderColor: '#3b82f6',
+                backgroundColor: 'rgba(59, 130, 246, 0.14)',
+                tension: 0.35,
+                fill: true,
+                yAxisID: 'y1'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: { title: { display: true, text: 'NO2' } },
+                y1: {
+                    position: 'right',
+                    grid: { drawOnChartArea: false },
+                    title: { display: true, text: 'Tráfico' }
+                }
+            }
+        }
+    });
+}
+
+function fitRoutesOnMap(routes) {
+    const bounds = [];
+    routes.forEach(route => {
+        route.points.forEach(point => bounds.push([point.lat, point.lon]));
+    });
+    if (bounds.length) {
+        ecoMap.fitBounds(bounds, { padding: [24, 24] });
+    }
+}
+
+async function loadZones() {
+    try {
+        const response = await fetch('/api/zones');
+        const data = await response.json();
+        state.zones = Array.isArray(data) ? data : [];
+    } catch (error) {
+        console.error('Error loading zones', error);
+        state.zones = [];
+    }
+}
+
+async function calculateRoute() {
+    const originInput = document.getElementById('route-origin').value;
+    const destInput = document.getElementById('route-dest').value;
+    const mode = document.getElementById('route-mode').value;
+    const originZone = resolveZone(originInput);
+    const destZone = resolveZone(destInput);
+    const comparative = document.getElementById('route-comparative');
+
+    if (!originZone || !destZone) {
+        comparative.innerHTML = '<p>Escribe un origen y destino válidos usando nombre o id de zona.</p>';
+        return;
+    }
+
+    const params = new URLSearchParams({ origin: originZone.id, destination: destZone.id, mode });
+    const response = await fetch(`/api/ecoruta?${params.toString()}`);
+    const data = await response.json();
+    const routes = Array.isArray(data.routes) ? data.routes : [];
+    state.routes = routes;
+
+    clearRouteLayers();
+    routes.forEach(route => {
+        const latLngs = route.points.map(point => [point.lat, point.lon]);
+        const polyline = L.polyline(latLngs, { color: route.color, weight: 6, opacity: 0.9, lineCap: 'round' }).addTo(state.routeLayers);
+        polyline.bindTooltip(`${route.name}: ${route.label}`, { sticky: true });
+        L.circleMarker(latLngs[0], { radius: 7, color: route.color, fillColor: route.color, fillOpacity: 1 }).addTo(state.routeLayers);
+        L.circleMarker(latLngs[latLngs.length - 1], { radius: 7, color: route.color, fillColor: '#ffffff', fillOpacity: 1 }).addTo(state.routeLayers);
+    });
+
+    renderRouteResults(routes, originZone, destZone);
+    fitRoutesOnMap(routes);
+    renderBestHoursChart(data.bestHours || []);
+}
+
+document.getElementById('btn-calc-route').addEventListener('click', () => {
+    calculateRoute().catch(error => {
+        console.error('Route calculation failed', error);
+        document.getElementById('route-comparative').innerHTML = '<p>No se pudo calcular la ruta.</p>';
+    });
+});
+
+document.getElementById('route-dest').addEventListener('keydown', event => {
+    if (event.key === 'Enter') {
+        calculateRoute().catch(error => console.error(error));
+    }
+});
+
+document.getElementById('route-origin').addEventListener('keydown', event => {
+    if (event.key === 'Enter') {
+        calculateRoute().catch(error => console.error(error));
+    }
 });
 
 // Fetch Dashboard Data
@@ -89,6 +307,7 @@ async function loadDashboard() {
         console.error("Error loading dashboard", e);
     }
 }
+loadZones();
 loadDashboard();
 
 // 3D AirWatch Scene

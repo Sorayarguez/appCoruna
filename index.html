@@ -216,6 +216,43 @@ body {
     min-height: auto;
     padding-top: 58px;
   }
+
+@media (max-width: 1100px) {
+  #app { flex-direction: column; height: auto; min-height: 100vh; width: 100%; }
+  .sidebar { width: 100%; min-height: auto; position: sticky; top: 0; z-index: 40; }
+  .nav { display: flex; gap: 8px; overflow-x: auto; overflow-y: hidden; padding: 12px 10px; }
+  .nav-item { flex: 0 0 auto; border-left: 0; border-radius: 10px; padding: 10px 14px; }
+  .main { width: 100%; overflow-y: visible; }
+  .content { padding: 14px; }
+  .dashboard-hero { flex-direction: column; gap: 14px; }
+  .hero-content { min-width: 0; }
+  .hero-mascot { width: 100%; max-width: 280px; height: 180px; }
+  .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+  .indicator-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .topbar { flex-direction: column; align-items: flex-start; gap: 10px; padding: 16px 14px 12px; }
+  .topbar > div { width: 100%; flex-wrap: wrap; }
+  .chart-box, #dash-map, #aw-map, #eco-map, #gs-map, #canvas3d { height: 280px !important; }
+  .fiware-diagram { min-height: 0; grid-template-columns: 1fr; }
+  .fiware-links { display: none; }
+  .fiware-node, .fiware-node--primary, .fiware-node--impact, .fiware-node--air, .fiware-node--forecast, .fiware-node--noise, .fiware-node--device, .fiware-node--model { grid-column: auto; grid-row: auto; }
+  .grafana-container iframe { min-height: 260px; }
+  .chat-widget { left: 10px; right: 10px; width: auto; bottom: 10px; }
+  .chat-msgs { max-height: 220px; }
+}
+
+@media (max-width: 700px) {
+  .logo { padding: 18px 16px 12px; }
+  .logo h1 { font-size: 1.45rem; }
+  .nav-item { font-size: 0.9rem; }
+  .indicator-grid { grid-template-columns: 1fr; }
+  .hero-content p { font-size: 0.95rem; }
+  .mapbox { height: 300px; }
+  .chart-box { height: 250px; }
+  .chat-head { padding: 10px 12px; }
+  .chat-inp { padding: 10px; }
+  .chat-inp input { font-size: 16px; }
+  .msg { max-width: 86%; }
+}
   .fiware-links { display: none; }
   .fiware-node,
   .fiware-node--primary,
@@ -339,6 +376,39 @@ body {
   .hero-mascot { width:120px; height:120px; }
   .mascot-plate { width:100px; height:100px; border-radius:14px; }
   .hero-bubble { display:none; }
+}
+
+@media (max-width: 1100px) {
+  #app { flex-direction: column; height: auto; min-height: 100vh; }
+  .sidebar { width: 100%; position: sticky; top: 0; z-index: 30; }
+  .nav { display: flex; gap: 8px; overflow-x: auto; overflow-y: hidden; padding: 12px 8px; }
+  .nav-item { flex: 0 0 auto; padding: 10px 14px; border-left: 0; border-radius: 10px; }
+  .main { overflow-y: visible; }
+  .content { padding: 12px 14px 18px; }
+  .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; gap: 14px; }
+  .dashboard-hero { flex-direction: column; gap: 14px; padding: 18px; }
+  .hero-mascot { width: 100%; max-width: 220px; height: 180px; }
+  .indicator-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .topbar { flex-direction: column; align-items: flex-start; gap: 12px; padding: 18px 14px 12px; }
+  .topbar > div { width: 100%; flex-wrap: wrap; }
+  .chart-box, #dash-map, #aw-map, #eco-map, #gs-map, #canvas3d { height: 280px !important; }
+  .card, .kpi, .route-card, .achievement, .zone-row, .sel, .btn-mode, .chat-widget { box-shadow: var(--shadow); }
+  .chat-widget { width: calc(100% - 16px); right: 8px; left: 8px; bottom: 8px; }
+  .chat-msgs { max-height: 220px; }
+  .msg { max-width: 86%; }
+}
+
+@media (max-width: 700px) {
+  .sidebar { padding-bottom: 8px; }
+  .logo { padding: 18px 16px 12px; }
+  .logo h1 { font-size: 1.45rem; }
+  .nav-item { font-size: 0.9rem; }
+  .indicator-grid { grid-template-columns: 1fr; }
+  .hero-content p { font-size: 0.95rem; }
+  .hero-image { min-height: 160px; object-fit: cover; }
+  .chat-head { padding: 10px 12px; }
+  .chat-inp { padding: 10px; }
+  .chat-inp input { font-size: 16px; }
 }
 
 /* Profile */
@@ -469,9 +539,9 @@ body.light-mode .edit-input { background: #fff; color: #000; }
       </h2>
       <div style="display:flex; gap:16px; align-items:center;">
         <div class="status"><div class="dot"></div> {{ t('sysActive') }}</div>
-        <div style="background:rgba(0,0,0,0.3); border-radius:8px; display:flex; border:1px solid rgba(0,229,255,0.3); overflow:hidden;">
-          <button style="border:none; padding:8px 12px; cursor:pointer; font-weight:bold; color:white; background:transparent; transition:0.3s;" :style="viewMode==='ciudadano'?'background:var(--primary);color:#000':''" @click="viewMode='ciudadano'">{{ t('modeC') }}</button>
-          <button style="border:none; padding:8px 12px; cursor:pointer; font-weight:bold; color:white; background:transparent; transition:0.3s;" :style="viewMode==='alcalde'?'background:var(--primary);color:#000':''" @click="viewMode='alcalde'">{{ t('modeA') }}</button>
+        <div style="background:var(--panel); border-radius:8px; display:flex; border:1px solid var(--border); overflow:hidden;">
+          <button style="border:none; padding:8px 12px; cursor:pointer; font-weight:bold; color:var(--text); background:transparent; transition:0.3s;" :style="viewMode==='ciudadano'?'background:var(--primary);color:#000':''" @click="viewMode='ciudadano'">{{ t('modeC') }}</button>
+          <button style="border:none; padding:8px 12px; cursor:pointer; font-weight:bold; color:var(--text); background:transparent; transition:0.3s;" :style="viewMode==='alcalde'?'background:var(--primary);color:#000':''" @click="viewMode='alcalde'">{{ t('modeA') }}</button>
         </div>
       </div>
     </div>
@@ -485,7 +555,7 @@ body.light-mode .edit-input { background: #fff; color: #000; }
           <div class="hero-content">
             <h3 style="color:var(--primary); font-size:1.6rem; margin-bottom:8px; font-weight:800; display:flex; align-items:center; gap:10px;">{{ t('welcome') }}</h3>
             <div class="hero-tagline" style="margin-bottom:12px;color:var(--muted);font-weight:600">{{ heroPhrase }}</div>
-            <p style="font-size:1rem; line-height:1.6; color:#cbd5e1; max-width:720px;">{{ t('welcomeSub') }}<br><br>
+            <p style="font-size:1rem; line-height:1.6; color:var(--text); max-width:720px;">{{ t('welcomeSub') }}<br><br>
               <b style="color:var(--text)">{{ t('howTo') }}</b><br>
               <span style="color:var(--primary)">•</span> <b>AirWatch</b>: {{ t('descAir') }}<br>
               <span style="color:var(--primary)">•</span> <b>EcoRuta</b>: {{ t('descEco') }}<br>
@@ -515,12 +585,12 @@ body.light-mode .edit-input { background: #fff; color: #000; }
                 <span><span class="badge red">NO₂ {{ a.no2 }} µg/m³</span></span>
               </div>
             </div>
-            <div v-else style="color:var(--muted);font-size:0.95rem; padding:20px; text-align:center; background:rgba(0,0,0,0.2); border-radius:10px;">
+            <div v-else style="color:var(--muted);font-size:0.95rem; padding:20px; text-align:center; background:var(--panel); border-radius:10px;">
               {{ t('noAlerts') }}
             </div>
             <div style="margin-top:24px">
               <h3 style="font-size:0.9rem;margin-bottom:12px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;">{{ t('syncTitle') }}</h3>
-              <div v-for="z in zonas.slice(0,5)" :key="z.id" style="display:flex;justify-content:space-between;font-size:0.85rem;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05)">
+              <div v-for="z in zonas.slice(0,5)" :key="z.id" style="display:flex;justify-content:space-between;font-size:0.85rem;padding:8px 0;border-bottom:1px solid var(--border)">
                 <span style="color:#e2e8f0">{{ z.name }}</span>
                 <span style="color:var(--primary); font-family:monospace">{{ formatTs(z.timestamp) }}</span>
               </div>
@@ -610,6 +680,13 @@ body.light-mode .edit-input { background: #fff; color: #000; }
             </section>
           </div>
         </div>
+        <div class="card">
+          <h3 style="margin-bottom:16px;font-size:1.1rem;color:var(--primary)">Grafana Dashboards</h3>
+          <p style="margin-bottom:12px;color:var(--muted);">Panel embebido con series temporales de tráfico y calidad del aire.</p>
+          <div class="grafana-container" style="height:420px;border-radius:12px;overflow:hidden;border:1px solid var(--border);background:var(--panel);">
+            <iframe src="http://localhost:3000/d/urbs-dashboard/urbs-panel-de-bienestar-urbano-a-coruc3b1-a?orgId=1&kiosk" frameborder="0" style="width:100%;height:100%;border:0;"></iframe>
+          </div>
+        </div>
       </div>
 
       <!-- ===== AIRWATCH ===== -->
@@ -688,19 +765,19 @@ body.light-mode .edit-input { background: #fff; color: #000; }
               <span class="badge" :class="i===1?'yellow':i===2?'red':''">● {{ r.label }}</span>
             </div>
             <div class="grid-4" style="gap:12px">
-              <div style="text-align:center; background:rgba(0,0,0,0.2); padding:10px; border-radius:8px;">
+              <div style="text-align:center; background:var(--panel); padding:10px; border-radius:8px;">
                 <div style="font-weight:800; font-size:1.2rem; color:var(--text)">{{ r.distKm }} km</div>
                 <div style="font-size:0.75rem;color:var(--muted);text-transform:uppercase;margin-top:4px;">{{ t('ecoDist') }}</div>
               </div>
-              <div style="text-align:center; background:rgba(0,0,0,0.2); padding:10px; border-radius:8px;">
+              <div style="text-align:center; background:var(--panel); padding:10px; border-radius:8px;">
                 <div style="font-weight:800; font-size:1.2rem; color:var(--primary)">{{ getRouteStats(r).timeMin }} min</div>
                 <div style="font-size:0.75rem;color:var(--muted);text-transform:uppercase;margin-top:4px;">{{ t('ecoTime') }} ({{ tMode }})</div>
               </div>
-              <div style="text-align:center; background:rgba(0,0,0,0.2); padding:10px; border-radius:8px;">
+              <div style="text-align:center; background:var(--panel); padding:10px; border-radius:8px;">
                 <div style="font-weight:800; font-size:1.2rem;" :style="{color: getRouteStats(r).co2g > 0 ? 'var(--red)' : 'var(--green)'}">{{ getRouteStats(r).co2g }} g</div>
                 <div style="font-size:0.75rem;color:var(--muted);text-transform:uppercase;margin-top:4px;">{{ t('ecoFoot') }}</div>
               </div>
-              <div style="text-align:center; background:rgba(0,0,0,0.2); padding:10px; border-radius:8px;">
+              <div style="text-align:center; background:var(--panel); padding:10px; border-radius:8px;">
                 <div style="font-weight:800; font-size:1.2rem; color:var(--text)">{{ r.pollutionIndex }}</div>
                 <div style="font-size:0.75rem;color:var(--muted);text-transform:uppercase;margin-top:4px;">{{ t('ecoIdx') }}</div>
               </div>
@@ -852,7 +929,7 @@ const savedLang = localStorage.getItem('urbs-lang');
 const savedTheme = localStorage.getItem('urbs-theme');
 const prefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
 const initialLang = savedLang === 'en' ? 'en' : 'es';
-const initialTheme = savedTheme ? savedTheme === 'light' : prefersLight;
+const initialTheme = savedTheme ? savedTheme === 'light' : false;
 const greetingText = (code) => code === 'en' ? 'Hello! I am URBS. I monitor the city for you.' : '¡Hola! Soy URBS. Monitorizo la ciudad para ti.';
 const offlineText = (code) => code === 'en' ? 'I cannot connect to the URBS server right now. I am replying with local data.' : 'No puedo conectar con el servidor URBS ahora mismo. Te respondo con datos locales.';
 
@@ -1037,6 +1114,15 @@ const handleAvatarUpload = (e) => {
 watch(isLight, (val) => {
   document.body.classList.toggle('light-mode', val);
   localStorage.setItem('urbs-theme', val ? 'light' : 'dark');
+  [dashMap, awMap, ecoMap, gsMap].forEach((map) => {
+    if (!map) return;
+    map.eachLayer((layer) => {
+      if (layer instanceof L.TileLayer) {
+        layer.setUrl(mapTileUrl());
+      }
+    });
+    map.invalidateSize();
+  });
 });
 
 watch(viewMode, (nm) => {
