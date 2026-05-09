@@ -1,5 +1,10 @@
-from flask import Flask, request, jsonify
-from flask_cors import CORS
+from flask import Flask, request, jsonify, send_from_directory
+try:
+    from flask_cors import CORS
+except Exception:
+    # Allow running locally even if flask_cors is not installed
+    def CORS(app):
+        print('Warning: flask_cors not installed; CORS disabled')
 from datetime import datetime, timedelta
 import os
 import requests, math, heapq, random
@@ -123,6 +128,10 @@ def get_zones():
     else:
         zones = synthetic_zone_data()
 
+    # normalize ids to lowercase for consistent matching
+    for z in zones:
+        if 'id' in z and isinstance(z['id'], str):
+            z['id'] = z['id']
     return jsonify(zones)
 
 @app.route("/api/dashboard", methods=["GET"])
@@ -164,26 +173,40 @@ def get_airwatch():
     for fc in forecasts_orion:
         ref = fc.get("refTrafficFlowObserved", {}).get("value", "")
         zid = ref.split(":")[-1] if ref else None
+        zid_l = zid.lower() if zid else None
         h   = val(fc, "forecastHour") or 1
         if zid:
-            if zid not in fc_map: fc_map[zid] = []
-            fc_map[zid].append({"hour": int(h), "no2": val(fc, "NO2Concentration"), "aqi": val(fc, "airQualityIndex"), "traffic": val(fc, "trafficIntensity")})
+            key = zid_l
+            if key not in fc_map: fc_map[key] = []
+            fc_map[key].append({"hour": int(h), "no2": val(fc, "NO2Concentration"), "aqi": val(fc, "airQualityIndex"), "traffic": val(fc, "trafficIntensity")})
     # If no forecasts, generate synthetic
+    # Build lookup map for zones by lowercase id
+    zone_lookup = { (z.get('id') or '').lower(): z for z in zones }
     for z in zones:
         zid = z["id"]
-        if zid not in fc_map:
+        zid_l = zid.lower() if isinstance(zid, str) else zid
+        if zid_l not in fc_map:
             fc_map[zid] = []
             for h in range(1, 7):
                 hour_abs = (datetime.utcnow().hour + h) % 24
                 peak = 1.3 if (7 <= hour_abs <= 9 or 17 <= hour_abs <= 20) else 0.75
-                fc_map[zid].append({"hour": h, "no2": round(z["no2"]*peak*random.uniform(0.9,1.1),1),
+                fc_map[zid_l].append({"hour": h, "no2": round(z["no2"]*peak*random.uniform(0.9,1.1),1),
                     "aqi": round(z["aqi"]*peak, 1), "traffic": int(z["traffic"]*peak)})
         else:
-            fc_map[zid].sort(key=lambda x: x["hour"])
-    # If caller requested a single zone, trim forecasts to that zone only
+            fc_map[zid_l].sort(key=lambda x: x["hour"])
+    # Prepare return forecasts mapping using original zone ids when possible
+    out_fc = {}
+    for zl, arr in fc_map.items():
+        orig = zone_lookup.get(zl, {}).get('id') or zl
+        out_fc[orig] = arr
+
+    # If caller requested a single zone, filter zones and forecasts (case-insensitive)
     if zone_filter and zone_filter != 'global':
-        fc_map = {k: v for k, v in fc_map.items() if k == zone_filter}
-    return jsonify({"zones": zones, "forecasts": fc_map})
+        zf = zone_filter.lower()
+        zones = [z for z in zones if (z.get('id') or '').lower() == zf]
+        out_fc = {k: v for k, v in out_fc.items() if (k or '').lower() == zf}
+
+    return jsonify({"zones": zones, "forecasts": out_fc})
 
 @app.route("/api/ecoruta", methods=["GET"])
 def get_ecoruta():
@@ -392,6 +415,19 @@ def activate_ecozone(zone_id):
 @app.route("/api/ecozones/<zone_id>/deactivate", methods=["POST"])
 def deactivate_ecozone(zone_id):
     return jsonify({"status":"success","message":f"ZBE desactivada en {zone_id}."})
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def serve_frontend(path):
+    # Serve index.html at root and static files from the workspace
+    if path == '' or path == 'index.html':
+        return send_from_directory('.', 'index.html')
+    # First try to serve file from workspace root, else from ./static
+    try:
+        return send_from_directory('.', path)
+    except Exception:
+        return send_from_directory('static', path)
+
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8000, debug=True)
+    port = int(os.environ.get('PORT', 8000))
+    app.run(host="0.0.0.0", port=port, debug=True)

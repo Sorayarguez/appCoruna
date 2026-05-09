@@ -614,17 +614,17 @@ body.light-mode .edit-input { background: #fff; color: #000; }
 
       <!-- ===== AIRWATCH ===== -->
       <div v-show="tab==='airwatch'">
-        <div class="indicator-grid">
-          <div class="ind" v-for="ind in indicators" :key="ind.label">
-            <div class="ind-val" :style="{color: ind.color}">{{ ind.value }}</div>
-            <div class="ind-lbl">{{ ind.label }}</div>
-          </div>
-        </div>
         <div style="margin:12px 0; display:flex; gap:8px; align-items:center;">
           <label style="color:var(--muted); font-size:0.9rem;">Zona:</label>
           <select id="zoneSelect" class="sel">
             <option value="global">Global</option>
           </select>
+        </div>
+        <div class="indicator-grid">
+          <div class="ind" v-for="ind in indicators" :key="ind.label">
+            <div class="ind-val" :style="{color: ind.color}">{{ ind.value }}</div>
+            <div class="ind-lbl">{{ ind.label }}</div>
+          </div>
         </div>
         <div class="grid-2" style="margin-top:24px">
           <div class="card">
@@ -1038,12 +1038,14 @@ const formatTs=ts=>{if(!ts)return'N/A';const d=new Date(ts);return d.toLocaleTim
 const fetchZones=async()=>{
 try{const r=await fetch(`${API}/api/zones`);zonas.value=await r.json();}
 catch{zonas.value=syntheticZones();}
+normalizeZones();
 populateZoneSelect();
 };
 
 const fetchDash=async()=>{
 try{const r=await fetch(`${API}/api/dashboard`);const d=await r.json();dash.value=d;if(d.zones)zonas.value=d.zones;}
 catch{const z=syntheticZones();zonas.value=z;dash.value={avgAqi:Math.round(z.reduce((s,x)=>s+x.aqi,0)/z.length),avgTraffic:Math.round(z.reduce((s,x)=>s+x.traffic,0)/z.length),alertCount:z.filter(x=>x.no2>55).length,avgGreenScore:Math.round(z.reduce((s,x)=>s+x.greenScore,0)/z.length),alerts:z.filter(x=>x.no2>55).map(x=>({zone:x.name,no2:x.no2,noise:x.noise}))};}
+normalizeZones();
 populateZoneSelect();
 updateDashMap();updateIndicators();
 };
@@ -1061,6 +1063,21 @@ const populateZoneSelect = () => {
   });
   sel.value = cur;
   sel.onchange = async () => { await loadAirwatchForZone(sel.value); };
+};
+
+const normalizeZones = () => {
+  const zn = zonas.value || [];
+  for(let i=0;i<zn.length;i++){
+    const z = zn[i];
+    let lat = Number(z.lat);
+    let lon = Number(z.lon);
+    if(isNaN(lat) || isNaN(lon)) continue;
+    const latOk = lat >= 40 && lat <= 46;
+    const lonOk = lon >= -25 && lon <= 5;
+    if(!latOk && lonOk){ const t = lat; z.lat = lon; z.lon = t; }
+    else if(!latOk && !lonOk){ const t = lat; if(t >= -25 && t <= 5 && lon >= 40 && lon <= 46){ z.lat = lon; z.lon = t; } }
+  }
+  zonas.value = zn;
 };
 
 const loadAirwatchForZone = async (zoneId) => {
@@ -1200,13 +1217,9 @@ scatterChart=new Chart(ctx,{type:'scatter',data:{datasets:[{label:'Zonas A CoruÃ
 const initForecastChart=async()=>{
 const ctx=document.getElementById('forecast-chart');if(!ctx)return;
 let fcData=[];
-try{const r=await fetch(`${API}/api/airwatch`);const d=await r.json();
-    // If a zone is selected, request its forecasts
     const sel = document.getElementById('zoneSelect');
-    if(sel && sel.value && sel.value!=='global'){
-      const r2 = await fetch(`${API}/api/airwatch?zone=${sel.value}`);
-      if(r2.status===200){const d2 = await r2.json(); d.zones = d2.zones; d.forecasts = d2.forecasts;}
-    }
+    const url = (sel && sel.value && sel.value!=='global') ? `${API}/api/airwatch?zone=${sel.value}` : `${API}/api/airwatch`;
+    const r = await fetch(url); const d = await r.json();
     const fcs=d.forecasts||{};const zids=Object.keys(fcs).slice(0,3);
 const labels=['1h','2h','3h','4h','5h','6h'];
 const colors=['#00e5ff','#00e676','#ffea00'];
