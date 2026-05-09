@@ -128,10 +128,33 @@ def get_zones():
     else:
         zones = synthetic_zone_data()
 
-    # normalize ids to lowercase for consistent matching
+    # sanitize and normalize coordinates and ids
     for z in zones:
+        # ensure id is a string
         if 'id' in z and isinstance(z['id'], str):
             z['id'] = z['id']
+        # coerce numeric lat/lon and fix swapped values if necessary
+        try:
+            lat = float(z.get('lat', 0))
+            lon = float(z.get('lon', 0))
+        except Exception:
+            # fallback to metadata if available
+            meta = next((m for m in ZONES_META if m['id'].lower() == str(z.get('id','')).lower()), None)
+            if meta:
+                lat = meta['lat']; lon = meta['lon']
+            else:
+                lat = 43.362; lon = -8.411
+        # If values look swapped (lat out of plausible range and lon looks like lat), swap them
+        lat_ok = 40.0 <= lat <= 46.0
+        lon_ok = -25.0 <= lon <= 5.0
+        if not lat_ok and lon_ok:
+            lat, lon = lon, lat
+        # second check: both outside but reversed ranges
+        if not lat_ok and not lon_ok:
+            if -25.0 <= lat <= 5.0 and 40.0 <= lon <= 46.0:
+                lat, lon = lon, lat
+        z['lat'] = round(float(lat), 6)
+        z['lon'] = round(float(lon), 6)
     return jsonify(zones)
 
 @app.route("/api/dashboard", methods=["GET"])

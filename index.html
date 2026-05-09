@@ -828,6 +828,16 @@ body.light-mode .edit-input { background: #fff; color: #000; }
 
 
 <script>
+// Ensure Vue is available; if not, attempt a CDN fallback and reload
+if (typeof Vue === 'undefined') {
+  console.error('Vue not found, loading fallback...');
+  const s = document.createElement('script');
+  s.src = 'https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js';
+  s.crossOrigin = 'anonymous';
+  s.onload = () => { console.info('Fallback Vue loaded, reloading page'); window.location.reload(); };
+  s.onerror = () => { console.error('Failed to load fallback Vue. App will not mount.'); };
+  document.head.appendChild(s);
+}
 const {createApp,ref,onMounted,watch}=Vue;
 const API='http://localhost:8000';
 createApp({setup(){
@@ -1037,14 +1047,14 @@ const formatTs=ts=>{if(!ts)return'N/A';const d=new Date(ts);return d.toLocaleTim
 
 const fetchZones=async()=>{
 try{const r=await fetch(`${API}/api/zones`);zonas.value=await r.json();}
-catch{zonas.value=syntheticZones();}
+catch(e){zonas.value=syntheticZones();}
 normalizeZones();
 populateZoneSelect();
 };
 
 const fetchDash=async()=>{
 try{const r=await fetch(`${API}/api/dashboard`);const d=await r.json();dash.value=d;if(d.zones)zonas.value=d.zones;}
-catch{const z=syntheticZones();zonas.value=z;dash.value={avgAqi:Math.round(z.reduce((s,x)=>s+x.aqi,0)/z.length),avgTraffic:Math.round(z.reduce((s,x)=>s+x.traffic,0)/z.length),alertCount:z.filter(x=>x.no2>55).length,avgGreenScore:Math.round(z.reduce((s,x)=>s+x.greenScore,0)/z.length),alerts:z.filter(x=>x.no2>55).map(x=>({zone:x.name,no2:x.no2,noise:x.noise}))};}
+catch(e){const z=syntheticZones();zonas.value=z;dash.value={avgAqi:Math.round(z.reduce((s,x)=>s+x.aqi,0)/z.length),avgTraffic:Math.round(z.reduce((s,x)=>s+x.traffic,0)/z.length),alertCount:z.filter(x=>x.no2>55).length,avgGreenScore:Math.round(z.reduce((s,x)=>s+x.greenScore,0)/z.length),alerts:z.filter(x=>x.no2>55).map(x=>({zone:x.name,no2:x.no2,noise:x.noise}))};}
 normalizeZones();
 populateZoneSelect();
 updateDashMap();updateIndicators();
@@ -1092,14 +1102,14 @@ const loadAirwatchForZone = async (zoneId) => {
 
 const fetchGS=async()=>{
 try{const r=await fetch(`${API}/api/greenscore`);const d=await r.json();gsRanked.value=d.ranked||[];bestZone.value=d.bestZone||null;}
-catch{const z=syntheticZones();const ranked=[...z].sort((a,b)=>b.greenScore-a.greenScore).map((x,i)=>({...x,rank:i+1,trend:['up','down','stable'][Math.floor(Math.random()*3)],mlPrediction:Math.round(x.greenScore*0.98)}));gsRanked.value=ranked;bestZone.value=ranked[0]||null;}
+catch(e){const z=syntheticZones();const ranked=[...z].sort((a,b)=>b.greenScore-a.greenScore).map((x,i)=>({...x,rank:i+1,trend:['up','down','stable'][Math.floor(Math.random()*3)],mlPrediction:Math.round(x.greenScore*0.98)}));gsRanked.value=ranked;bestZone.value=ranked[0]||null;}
 updateGSMap();updateRadarChart();
 };
 
 const calcRuta=async()=>{
 if(!ecoOrigen.value||!ecoDest.value)return;
 try{const r=await fetch(`${API}/api/ecoruta?origin=${ecoOrigen.value}&destination=${ecoDest.value}`);const d=await r.json();rutas.value=d.routes||[];bestHours.value=d.bestHours||[];if(d.zones&&d.zones.length)zonas.value=d.zones;}
-catch{rutas.value=[];bestHours.value=[];}
+catch(e){rutas.value=[];bestHours.value=[];}
 drawEcoRoutes();updateBestHourChart();
 };
 
@@ -1217,16 +1227,25 @@ scatterChart=new Chart(ctx,{type:'scatter',data:{datasets:[{label:'Zonas A Coru�
 const initForecastChart=async()=>{
 const ctx=document.getElementById('forecast-chart');if(!ctx)return;
 let fcData=[];
-    const sel = document.getElementById('zoneSelect');
+  try{
+  const sel = document.getElementById('zoneSelect');
     const url = (sel && sel.value && sel.value!=='global') ? `${API}/api/airwatch?zone=${sel.value}` : `${API}/api/airwatch`;
     const r = await fetch(url); const d = await r.json();
     const fcs=d.forecasts||{};const zids=Object.keys(fcs).slice(0,3);
 const labels=['1h','2h','3h','4h','5h','6h'];
 const colors=['#00e5ff','#00e676','#ffea00'];
-const datasets=zids.map((zid,i)=>({label:d.zones?.find(z=>z.id===zid)?.name||zid,data:(fcs[zid]||[]).map(f=>f.no2),borderColor:colors[i],backgroundColor:'transparent',borderWidth:3,tension:0.4,pointBackgroundColor:colors[i],pointRadius:4}));
+const datasets = zids.map((zid,i)=>{
+  const arr = (fcs[zid]||[]);
+  // build an array of length equal to labels (6), fill with null where missing
+  const data = labels.map((_,idx)=>{
+    const found = arr.find(f => Number(f.hour) === idx+1);
+    return found ? Number(found.no2) : null;
+  });
+  return {label: d.zones?.find(z=>z.id===zid)?.name||zid, data, borderColor:colors[i%colors.length], backgroundColor:'transparent', borderWidth:3, tension:0.4, pointBackgroundColor:colors[i%colors.length], pointRadius:4};
+});
 if(forecastChart)forecastChart.destroy();
 forecastChart=new Chart(ctx,{type:'line',data:{labels,datasets},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#94a3b8'}}},scales:{x:{ticks:{color:'#94a3b8'},grid:{color:'rgba(255,255,255,.05)'}},y:{title:{display:true,text:'NO₂ (µg/m³)',color:'#94a3b8'},ticks:{color:'#94a3b8'},grid:{color:'rgba(255,255,255,.05)'}}}}});
-}catch{const z=syntheticZones().slice(0,3);const labels=['1h','2h','3h','4h','5h','6h'];
+}catch(e){const z=syntheticZones().slice(0,3);const labels=['1h','2h','3h','4h','5h','6h'];
 if(forecastChart)forecastChart.destroy();
 forecastChart=new Chart(ctx,{type:'line',data:{labels,datasets:z.map((x,i)=>({label:x.name,data:[x.no2*.9,x.no2*1.1,x.no2*1.3,x.no2*1.2,x.no2*1.0,x.no2*.8],borderColor:['#00e5ff','#00e676','#ffea00'][i],backgroundColor:'transparent',borderWidth:3,tension:0.4}))},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#94a3b8'}}},scales:{x:{ticks:{color:'#94a3b8'},grid:{color:'rgba(255,255,255,.05)'}},y:{ticks:{color:'#94a3b8'},grid:{color:'rgba(255,255,255,.05)'}}}}}); }
 };
@@ -1421,8 +1440,8 @@ impactChart=new Chart(ctx,{type:'line',data:{labels:['Lun','Mar','Mié','Jue','V
 const sendChat=async()=>{
 const msg=chatIn.value.trim();if(!msg)return;
 chatMsgs.value.push({id:chatId++,text:msg,u:true});chatIn.value='';
-try{const r=await fetch(`${API}/api/chat`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:msg, mode: viewMode.value, lang: lang.value})});const d=await r.json();chatMsgs.value.push({id:chatId++,text:d.response,u:false});}
-catch{chatMsgs.value.push({id:chatId++,text:offlineText(lang.value),u:false});}
+  try{const r=await fetch(`${API}/api/chat`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:msg, mode: viewMode.value, lang: lang.value})});const d=await r.json();chatMsgs.value.push({id:chatId++,text:d.response,u:false});}
+  catch(e){chatMsgs.value.push({id:chatId++,text:offlineText(lang.value),u:false});}
 setTimeout(()=>{const el=document.getElementById('chat-msgs');if(el)el.scrollTop=el.scrollHeight;},100);
 };
 
