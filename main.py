@@ -235,9 +235,25 @@ def get_airwatch():
 def get_ecoruta():
     origin_id  = request.args.get("origin", "")
     dest_id    = request.args.get("destination", "")
-    zones_r = requests.get("http://localhost:8000/api/zones", timeout=5)
-    zones = zones_r.json() if zones_r.status_code == 200 else synthetic_zone_data()
+    mode       = (request.args.get("mode", "walk") or "walk").lower().strip()
+    mode_alias = {"pedestrian": "walk", "foot": "walk", "walking": "walk", "bike": "bike", "bici": "bike", "bus": "bus", "autobus": "bus", "car": "car", "coche": "car"}
+    mode       = mode_alias.get(mode, mode)
+    mode_profiles = {
+        "car":  {"speed": 30.0, "co2_rate": 140.0, "distance_w": 0.9, "pollution_w": 0.22, "traffic_w": 0.24, "exposure": 0.35, "neighbor_count": 6},
+        "bus":  {"speed": 20.0, "co2_rate": 68.0,  "distance_w": 0.92, "pollution_w": 0.16, "traffic_w": 0.2,  "exposure": 0.55, "neighbor_count": 6},
+        "bike": {"speed": 15.0, "co2_rate": 0.0,   "distance_w": 1.05, "pollution_w": 0.42, "traffic_w": 0.18, "exposure": 0.9,  "neighbor_count": 4},
+        "walk": {"speed": 5.0,  "co2_rate": 0.0,   "distance_w": 1.0,  "pollution_w": 0.5,  "traffic_w": 0.12, "exposure": 1.0,  "neighbor_count": 4},
+    }
+    profile = mode_profiles.get(mode, mode_profiles["walk"])
+    try:
+        zones_r = requests.get("http://localhost:8000/api/zones", timeout=3)
+        zones = zones_r.json() if zones_r.status_code == 200 else synthetic_zone_data()
+    except Exception:
+        zones = synthetic_zone_data()
     zone_map = {z["id"]: z for z in zones}
+    hub_ids = {"centro", "ensanche", "cuatroCaminos", "juanFlorez", "orzan", "riazor", "ciudadVieja"}
+    bus_hubs = hub_ids | {"matogrande", "asXubias"}
+    bus_core_ids = {"centro", "ensanche", "cuatroCaminos", "juanFlorez", "ciudadVieja"}
 
     def dist(a, b):
         return math.hypot(a["lat"]-b["lat"], a["lon"]-b["lon"])
@@ -245,18 +261,96 @@ def get_ecoruta():
     def salubrity_cost(z):
         return z["no2"]*0.4 + z["pm25"]*0.3 + z["noise"]*0.15 + (z["traffic"]/100)*0.15
 
+    def mode_edge_cost(from_zone, to_zone):
+        d_km = dist(from_zone, to_zone) * 111
+        base = d_km * profile["distance_w"]
+        pollution = salubrity_cost(to_zone) * profile["pollution_w"]
+        traffic = (to_zone.get("traffic", 0) / 100.0) * profile["traffic_w"]
+        access_penalty = 0.0
+        if mode == "bike" and to_zone.get("traffic", 0) > 700:
+            access_penalty += 2.0
+        if mode == "walk" and d_km > 1.6:
+            access_penalty += 1.25
+        if mode == "bus":
+            # Bus should prefer major corridors and hubs, not arbitrary neighborhood hops.
+            if to_zone["id"] in bus_hubs:
+                access_penalty -= 0.35
+            else:
+                access_penalty += 0.95
+            if from_zone["id"] not in bus_hubs:
+                access_penalty += 0.4
+            # Penalize very short hops for bus so it avoids awkward stop-by-stop zigzags.
+            if d_km < 0.8:
+                access_penalty += 0.75
+        if mode == "car" and to_zone.get("traffic", 0) < 300:
+            access_penalty += 0.2
+        return base + pollution + traffic + access_penalty
+
+    def bus_anchor(zones_subset, avoid_ids=None):
+        avoid_ids = set(avoid_ids or [])
+        candidates = [z for z in zones_subset if z["id"] in bus_core_ids and z["id"] not in avoid_ids]
+        if not candidates:
+            candidates = [z for z in zones_subset if z["id"] not in avoid_ids]
+        return min(candidates, key=lambda z: salubrity_cost(z) + (z.get("traffic", 0) / 220.0) + (0.15 * abs(z["lat"] - 43.365)) + (0.15 * abs(z["lon"] + 8.41))) if candidates else None
+
+    def bus_spine_path(src_id, dst_id, preferred_hub_id=None):
+        # Build a transit-oriented candidate set: origin, destination and the main bus spine hubs.
+        candidate_ids = {src_id, dst_id} | bus_core_ids
+        candidate_zones = [z for z in zones if z["id"] in candidate_ids]
+        candidate_map = {z["id"]: z for z in candidate_zones}
+        candidate_graph = {z["id"]: [] for z in candidate_zones}
+
+        for z1 in candidate_zones:
+            nbrs = sorted(candidate_zones, key=lambda z2: dist(z1, z2))[:min(5, len(candidate_zones))]
+            for z2 in nbrs:
+                if z2["id"] != z1["id"]:
+                    d_km = dist(z1, z2) * 111
+                    # Keep bus on broad, connected corridors: short local zigzags are discouraged.
+                    corridor_bonus = -0.28 if z2["id"] in bus_core_ids else 0.18
+                    if z1["id"] not in bus_core_ids:
+                        corridor_bonus += 0.35
+                    if d_km < 1.0:
+                        corridor_bonus += 0.6
+                    candidate_graph[z1["id"]].append((d_km * 0.92 + salubrity_cost(z2) * 0.08 + corridor_bonus, z2["id"]))
+
+        def candidate_dijkstra(src, dst):
+            pq = [(0, src, [src])]
+            seen = set()
+            while pq:
+                c, cur, path = heapq.heappop(pq)
+                if cur in seen:
+                    continue
+                seen.add(cur)
+                if cur == dst:
+                    return path, c
+                for ec, nb in candidate_graph.get(cur, []):
+                    if nb not in seen:
+                        heapq.heappush(pq, (c + ec, nb, path + [nb]))
+            return [], float("inf")
+
+        hub = candidate_map.get(preferred_hub_id) if preferred_hub_id in candidate_map else bus_anchor(candidate_zones, avoid_ids={src_id, dst_id})
+        if not hub:
+            return [], float("inf")
+        if hub["id"] in (src_id, dst_id):
+            hub = bus_anchor(candidate_zones, avoid_ids={src_id, dst_id, hub["id"]}) or hub
+
+        path_a, cost_a = candidate_dijkstra(src_id, hub["id"])
+        path_b, cost_b = candidate_dijkstra(hub["id"], dst_id)
+        if path_a and path_b:
+            return path_a + path_b[1:], cost_a + cost_b
+        return [], float("inf")
+
     def route_color(cost):
         return "#22c55e" if cost < 25 else "#eab308" if cost < 45 else "#ef4444"
 
     if origin_id and dest_id and origin_id in zone_map and dest_id in zone_map:
-        # Dijkstra on full zone graph
+        # Dijkstra on a mode-aware zone graph
         graph = {z["id"]: [] for z in zones}
         for z1 in zones:
-            nbrs = sorted(zones, key=lambda z2: dist(z1, z2))[:5]
+            nbrs = sorted(zones, key=lambda z2: dist(z1, z2))[:profile["neighbor_count"]]
             for z2 in nbrs:
                 if z2["id"] != z1["id"]:
-                    d = dist(z1, z2)
-                    cost = d * (salubrity_cost(z2) + 1)
+                    cost = mode_edge_cost(z1, z2)
                     graph[z1["id"]].append((cost, z2["id"]))
 
         def dijkstra(src, dst):
@@ -275,14 +369,27 @@ def get_ecoruta():
         # Route 1: optimal (min pollution)
         path1, cost1 = dijkstra(origin_id, dest_id)
 
-        # Route 2: through mid-zone
+        # Bus-specific refinement: force the main route through a bus interchange spine.
+        if mode == "bus":
+            bus_hub = bus_anchor(zones, avoid_ids={origin_id, dest_id})
+            path1_bus, cost1_bus = bus_spine_path(origin_id, dest_id, preferred_hub_id=bus_hub["id"] if bus_hub else None)
+            if path1_bus:
+                path1, cost1 = path1_bus, cost1_bus
+
+        # Route 2: through a healthy intermediate zone.
         mid_zones = [z for z in zones if z["id"] not in (origin_id, dest_id)]
+        if mode == "bus":
+            mid_zones = [z for z in mid_zones if z["id"] in bus_core_ids] or mid_zones
         mid = min(mid_zones, key=lambda z: salubrity_cost(z)) if mid_zones else None
         path2 = []
         cost2 = float("inf")
         if mid:
-            p2a, c2a = dijkstra(origin_id, mid["id"])
-            p2b, c2b = dijkstra(mid["id"], dest_id)
+            if mode == "bus":
+                p2a, c2a = bus_spine_path(origin_id, mid["id"])
+                p2b, c2b = bus_spine_path(mid["id"], dest_id)
+            else:
+                p2a, c2a = dijkstra(origin_id, mid["id"])
+                p2b, c2b = dijkstra(mid["id"], dest_id)
             if p2a and p2b:
                 path2 = p2a + p2b[1:]
                 cost2 = c2a + c2b
@@ -290,7 +397,7 @@ def get_ecoruta():
         # Route 3: fastest (fewest hops, ignores pollution)
         graph3 = {z["id"]: [] for z in zones}
         for z1 in zones:
-            nbrs = sorted(zones, key=lambda z2: dist(z1, z2))[:3]
+            nbrs = sorted(zones, key=lambda z2: dist(z1, z2))[:max(3, profile["neighbor_count"] - 2)]
             for z2 in nbrs:
                 if z2["id"] != z1["id"]:
                     graph3[z1["id"]].append((dist(z1, z2), z2["id"]))
@@ -314,19 +421,24 @@ def get_ecoruta():
             if not nodes: return None
             avg_cost = round(sum(salubrity_cost(n) for n in nodes)/len(nodes), 1)
             dist_km = round(sum(dist(nodes[i], nodes[i+1])*111 for i in range(len(nodes)-1)), 2)
-            time_min = round(dist_km / 5.0 * 60) # walking 5km/h
-            co2g = round(dist_km * 21, 1)
+            time_min = round(dist_km / profile["speed"] * 60)
+            if mode == "bus":
+                transfers = max(0, sum(1 for n in nodes[1:-1] if n["id"] in bus_core_ids) - 1)
+                time_min += transfers * 5 + max(0, len(nodes) - 2) * 1
+            co2g = round(dist_km * profile["co2_rate"], 1)
             color = route_color(avg_cost)
             return {
-                "name": name, "label": label, "color": color,
+                "name": name, "label": label, "mode": mode, "color": color,
+                "speedKmh": profile["speed"], "co2Rate": profile["co2_rate"],
+                "transfers": max(0, sum(1 for n in nodes[1:-1] if n["id"] in bus_core_ids) - 1) if mode == "bus" else 0,
                 "points": [{"lat": n["lat"], "lon": n["lon"], "name": n["name"]} for n in nodes],
                 "distKm": dist_km, "timeMin": time_min, "co2g": co2g,
                 "pollutionIndex": avg_cost,
             }
 
         routes = [r for r in [
-            build_route(path1, "Ruta EcoÓptima", "Menor contaminación"),
-            build_route(path2, "Ruta Alternativa", "Via zona verde"),
+            build_route(path1, "Ruta EcoÓptima", "Menor contaminación" if mode != "bus" else "Eje bus principal"),
+            build_route(path2, "Ruta Alternativa", "Via zona verde" if mode != "bus" else "Con intercambio simple"),
             build_route(path3, "Ruta Rápida", "Más directa"),
         ] if r]
 
@@ -344,8 +456,11 @@ def get_ecoruta():
 
 @app.route("/api/greenscore", methods=["GET"])
 def get_greenscore():
-    zones_r = requests.get("http://localhost:8000/api/zones", timeout=5)
-    zones = zones_r.json() if zones_r.status_code == 200 else synthetic_zone_data()
+    try:
+        zones_r = requests.get("http://localhost:8000/api/zones", timeout=3)
+        zones = zones_r.json() if zones_r.status_code == 200 else synthetic_zone_data()
+    except Exception:
+        zones = synthetic_zone_data()
     ranked = sorted(zones, key=lambda z: z["greenScore"], reverse=True)
     # Simulate previous hour trend
     for i, z in enumerate(ranked):

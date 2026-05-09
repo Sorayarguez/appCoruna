@@ -1132,21 +1132,18 @@ updateGSMap();updateRadarChart();
 
 const calcRuta=async()=>{
 if(!ecoOrigen.value||!ecoDest.value)return;
-try{const r=await fetch(`${API}/api/ecoruta?origin=${ecoOrigen.value}&destination=${ecoDest.value}`);const d=await r.json();rutas.value=d.routes||[];bestHours.value=d.bestHours||[];if(d.zones&&d.zones.length)zonas.value=d.zones;}
+try{const r=await fetch(`${API}/api/ecoruta?origin=${ecoOrigen.value}&destination=${ecoDest.value}&mode=${encodeURIComponent(tMode.value)}`);const d=await r.json();rutas.value=d.routes||[];bestHours.value=d.bestHours||[];if(d.zones&&d.zones.length)zonas.value=d.zones;}
 catch(e){rutas.value=[];bestHours.value=[];}
 drawEcoRoutes();updateBestHourChart();
 };
 
 const getRouteStats = (r) => {
-  const dist = r.distKm || 0;
-  let speed = 5, co2Rate = 0;
-  if (tMode.value === 'car') { speed = 30; co2Rate = 120; }
-  else if (tMode.value === 'bus') { speed = 20; co2Rate = 50; }
-  else if (tMode.value === 'bike') { speed = 15; co2Rate = 0; }
-  else if (tMode.value === 'walk') { speed = 5; co2Rate = 0; }
+  const dist = Number(r.distKm || 0);
+  const speed = Number(r.speedKmh || (tMode.value === 'car' ? 30 : tMode.value === 'bus' ? 20 : tMode.value === 'bike' ? 15 : 5));
+  const co2Rate = Number(r.co2Rate || (tMode.value === 'car' ? 140 : tMode.value === 'bus' ? 68 : 0));
   return {
-    timeMin: Math.max(1, Math.round((dist / speed) * 60)),
-    co2g: Math.round(dist * co2Rate)
+    timeMin: Number.isFinite(Number(r.timeMin)) ? Number(r.timeMin) : Math.max(1, Math.round((dist / speed) * 60)),
+    co2g: Number.isFinite(Number(r.co2g)) ? Number(r.co2g) : Math.round(dist * co2Rate)
   };
 };
 
@@ -1388,8 +1385,6 @@ for(const r of rutas.value) {
     const res = await fetch(`https://router.project-osrm.org/route/v1/${profile}/${coordsStr}?overview=full&geometries=geojson`);
     const data = await res.json();
     if(data.routes && data.routes.length > 0) {
-      const osrmDist = data.routes[0].distance / 1000;
-      r.distKm = parseFloat(osrmDist.toFixed(2));
       const latlngs = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
       const pl = L.polyline(latlngs, {color: r.color, weight: 6, opacity: 0.8});
       pl.addTo(ecoMap);
