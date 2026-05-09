@@ -1,0 +1,108 @@
+{
+  "uid": "urbs-dashboard",
+  "title": "URBS Panel de Bienestar Urbano A Coruña",
+  "tags": ["urbs", "fiware", "smartcity"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "editable": false,
+  "graphTooltip": 0,
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Evolución temporal NO2 + Intensidad tráfico",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": {
+        "type": "postgres",
+        "uid": "cratedb"
+      },
+      "targets": [
+        {
+          "rawSql": "SELECT time_index AS \"time\", NO2Concentration AS \"value\" FROM ettrafficenvironmentimpact ORDER BY time_index DESC LIMIT 100",
+          "format": "time_series",
+          "refId": "A"
+        },
+        {
+          "rawSql": "SELECT time_index AS \"time\", intensity AS \"value\" FROM ettrafficflowobserved ORDER BY time_index DESC LIMIT 100",
+          "format": "time_series",
+          "refId": "B"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "type": "heatmap",
+      "title": "Mapa de calor horario por zona",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": {
+        "type": "postgres",
+        "uid": "cratedb"
+      },
+      "targets": [
+        {
+          "rawSql": "SELECT time_index AS \"time\", NO2Concentration AS \"value\" FROM ettrafficenvironmentimpact ORDER BY time_index DESC LIMIT 200",
+          "format": "time_series",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "barchart",
+      "title": "ZBE Activas vs Calidad del Aire",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "datasource": {
+        "type": "postgres",
+        "uid": "cratedb"
+      },
+      "targets": [
+        {
+          "rawSql": "SELECT entity_id, AVG(PM25Concentration) AS avg_pm25 FROM ettrafficenvironmentimpact GROUP BY entity_id ORDER BY avg_pm25 DESC",
+          "format": "table",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "title": "Alertas Activas (> Umbral NO2)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "datasource": {
+        "type": "postgres",
+        "uid": "cratedb"
+      },
+      "targets": [
+        {
+          "rawSql": "SELECT time_index, entity_id, NO2Concentration FROM ettrafficenvironmentimpact WHERE NO2Concentration > 80 ORDER BY time_index DESC LIMIT 10",
+          "format": "table",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Resumen rápido de monitorización",
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 16 },
+      "datasource": {
+        "type": "postgres",
+        "uid": "cratedb"
+      },
+      "targets": [
+        {
+          "rawSql": "SELECT COUNT(*) AS total_alerts FROM ettrafficenvironmentimpact WHERE NO2Concentration > 80",
+          "format": "table",
+          "refId": "A"
+        }
+      ]
+    }
+  ]
+}

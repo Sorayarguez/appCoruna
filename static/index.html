@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>appCoruna - UrbanPulse Platform</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script type="module" src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs"></script>
+</head>
+<body class="dark-mode">
+    <nav class="sidebar">
+        <div class="logo">
+            <h2>appCoruña</h2>
+            <button id="theme-toggle" class="theme-toggle" type="button">Modo claro</button>
+        </div>
+        <ul class="nav-links">
+            <li class="active" data-target="dashboard">Dashboard</li>
+            <li data-target="airwatch">AirWatch</li>
+            <li data-target="ecoruta">EcoRuta</li>
+            <li data-target="greenscore">GreenScore</li>
+            <li data-target="historico">Histórico</li>
+            <li data-target="perfil">Mi Perfil</li>
+        </ul>
+    </nav>
+    <main class="content">
+        <!-- Dashboard -->
+        <section id="dashboard" class="tab-content active">
+            <header>
+                <h1>Dashboard Global</h1>
+                <p>Monitorización en tiempo real de A Coruña</p>
+            </header>
+            <div class="kpi-grid">
+                <div class="kpi-card glass"><h3>Calidad Aire</h3><p id="kpi-air">--</p></div>
+                <div class="kpi-card glass"><h3>Tráfico Medio</h3><p id="kpi-traffic">--</p></div>
+                <div class="kpi-card glass"><h3>Alertas Activas</h3><p id="kpi-alerts">0</p></div>
+                <div class="kpi-card glass"><h3>GreenScore</h3><p id="kpi-greenscore">--</p></div>
+            </div>
+            <div class="dashboard-body">
+                <div class="map-container glass" id="dashboard-map"></div>
+                <div class="side-panel">
+                    <div class="alerts-panel glass">
+                        <h3>Panel de Alertas</h3>
+                        <ul id="alerts-list"></ul>
+                    </div>
+                    <div class="uml-panel glass">
+                        <h3>Entidades del Sistema (UML)</h3>
+                        <div class="mermaid">
+                            classDiagram
+                            TrafficEnvironmentImpact --> TrafficFlowObserved : relates to
+                            TrafficEnvironmentImpactForecast --> TrafficFlowObserved : predicts
+                            ItemFlowObserved --> RoadSegment : locates
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- AirWatch -->
+        <section id="airwatch" class="tab-content">
+            <header>
+                <h1>AirWatch</h1>
+                <p>Análisis inmersivo de contaminación y tráfico</p>
+            </header>
+            <div class="airwatch-grid">
+                <div class="map-container glass" id="airwatch-map"></div>
+                <div class="three-container glass" id="airwatch-3d"></div>
+                <div class="chart-container glass">
+                    <canvas id="airwatch-correlation"></canvas>
+                </div>
+                <div class="indicators-panel glass">
+                    <h3>Indicadores en tiempo real</h3>
+                    <div id="airwatch-indicators"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- EcoRuta -->
+        <section id="ecoruta" class="tab-content">
+            <header>
+                <h1>EcoRuta</h1>
+                <p>Encuentra el camino más saludable y rápido</p>
+            </header>
+            <div class="ecoruta-body">
+                <div class="route-controls glass">
+                    <label for="route-mode">Modo de desplazamiento</label>
+                    <select id="route-mode">
+                        <option value="walk">A pie</option>
+                        <option value="bike">Bici</option>
+                        <option value="bus">Bus</option>
+                        <option value="car">Coche</option>
+                    </select>
+                    <label for="route-origin">Origen</label>
+                    <input type="text" id="route-origin" placeholder="Origen (ej. Calle Real)">
+                    <label for="route-dest">Destino</label>
+                    <input type="text" id="route-dest" placeholder="Destino (ej. Riazor)">
+                    <button id="btn-calc-route">Calcular Ruta</button>
+                    <div class="route-legend">
+                        <span><i class="legend-line eco"></i>Ruta EcoÓptima</span>
+                        <span><i class="legend-line alt"></i>Ruta Alternativa</span>
+                        <span><i class="legend-line fast"></i>Ruta Rápida</span>
+                    </div>
+                    <div id="route-comparative"></div>
+                </div>
+                <div class="map-container glass" id="ecoruta-map"></div>
+                <div class="chart-container glass" style="grid-column: span 2;">
+                    <canvas id="ecoruta-time"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- GreenScore -->
+        <section id="greenscore" class="tab-content">
+            <header>
+                <h1>GreenScore</h1>
+                <p>Ranking y métricas ambientales por barrios</p>
+            </header>
+            <div class="greenscore-grid">
+                <div class="map-container glass" id="greenscore-map"></div>
+                <div class="ranking-panel glass">
+                    <h3>Ranking de Barrios</h3>
+                    <ul id="greenscore-ranking"></ul>
+                </div>
+                <div class="chart-container glass" style="grid-column: span 2;">
+                    <canvas id="greenscore-radar"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- Histórico -->
+        <section id="historico" class="tab-content">
+            <header>
+                <h1>Histórico de Datos</h1>
+                <p>Evolución temporal y analítica de métricas</p>
+            </header>
+            <div class="history-controls glass">
+                <select id="hist-metric">
+                    <option value="no2">NO2</option>
+                    <option value="traffic">Tráfico</option>
+                </select>
+                <button id="btn-export-csv">Exportar a CSV</button>
+            </div>
+            <div class="history-charts">
+                <div class="chart-container glass"><canvas id="hist-line"></canvas></div>
+                <div class="chart-container glass"><canvas id="hist-bar"></canvas></div>
+            </div>
+            <div class="grafana-container glass">
+                <h3>Grafana Dashboards</h3>
+                <iframe src="http://localhost:3000/d/urbs-dashboard" frameborder="0"></iframe>
+            </div>
+        </section>
+
+        <!-- Mi Perfil -->
+        <section id="perfil" class="tab-content">
+            <header>
+                <h1>Mi Perfil</h1>
+                <p>Tu impacto en la ciudad</p>
+            </header>
+            <div class="profile-grid">
+                <div class="profile-card glass">
+                    <img src="https://via.placeholder.com/150" alt="Foto de Perfil" class="profile-pic">
+                    <h2>Usuario Coruña</h2>
+                    <p>Ciudadano Eco-Friendly</p>
+                    <div class="achievements">
+                        <span class="badge">Ruta Verde x10</span>
+                        <span class="badge">ZBE Supporter</span>
+                    </div>
+                </div>
+                <div class="urbs-assistant glass">
+                    <h3>Asistente URBS</h3>
+                    <div class="chat-window" id="chat-window">
+                        <div class="message bot">¡Hola! Soy URBS, tu asistente. ¿En qué te ayudo hoy?</div>
+                    </div>
+                    <div class="chat-input">
+                        <input type="text" id="chat-msg" placeholder="Pregunta algo...">
+                        <button id="btn-send-chat">Enviar</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+    <script type="module" src="/static/app.js"></script>
+</body>
+</html>

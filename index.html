@@ -1,567 +1,1593 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>URBS - Premium Urban Biosphere</title>
-    <!-- Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <!-- Leaflet -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Three.js -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <!-- Vue 3 -->
-    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
-    
-    <style>
-        :root {
-            --bg-base: #050505;
-            --glass-bg: rgba(15, 20, 30, 0.65);
-            --glass-border: rgba(255, 255, 255, 0.08);
-            --accent-cyan: #00f0ff;
-            --accent-magenta: #ff007f;
-            --accent-green: #39ff14;
-            --text-main: #f8fafc;
-            --text-muted: #94a3b8;
-            --font-family: 'Inter', sans-serif;
-        }
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>UrbanPulse - A Coruña Smart City</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        
-        body {
-            font-family: var(--font-family);
-            background-color: var(--bg-base);
-            color: var(--text-main);
-            overflow: hidden;
-            width: 100vw;
-            height: 100vh;
-        }
+:root {
+  --bg: #0b0f19;
+  --panel: rgba(22, 29, 46, 0.7);
+  --card: rgba(30, 40, 64, 0.5);
+  --surface: rgba(13, 19, 31, 0.9);
+  --surface-strong: rgba(10, 16, 30, 0.95);
+  --border: rgba(0, 229, 255, 0.16);
+  --border-strong: rgba(0, 229, 255, 0.3);
+  --primary: #00e5ff;
+  --primary-glow: rgba(0, 229, 255, 0.4);
+  --blue: #0077ff;
+  --green: #00e676;
+  --yellow: #ffea00;
+  --red: #ff1744;
+  --muted: #94a3b8;
+  --text: #f8fafc;
+  --shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
 
-        #map {
-            position: absolute;
-            top: 0; left: 0;
-            width: 100vw; height: 100vh;
-            z-index: 1;
-        }
+* { box-sizing: border-box; margin: 0; padding: 0; }
 
-        #app {
-            position: relative;
-            width: 100vw; height: 100vh;
-            z-index: 10;
-            pointer-events: none; /* Let clicks pass through to map */
-            display: flex;
-            justify-content: space-between;
-        }
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--bg);
+  background-image: radial-gradient(circle at 15% 50%, rgba(0, 229, 255, 0.05), transparent 25%),
+                    radial-gradient(circle at 85% 30%, rgba(0, 119, 255, 0.05), transparent 25%);
+  color: var(--text);
+  height: 100vh;
+  overflow: hidden;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
 
-        /* Re-enable pointer events for UI elements */
-        .ui-element { pointer-events: auto; }
+#app { display: flex; height: 100vh; }
 
-        /* Left Panel - Modules */
-        .sidebar {
-            width: 420px;
-            height: 100vh;
-            background: var(--glass-bg);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border-right: 1px solid var(--glass-border);
-            padding: 2rem;
-            display: flex;
-            flex-direction: column;
-            gap: 1.5rem;
-            overflow-y: auto;
-            box-shadow: 5px 0 30px rgba(0,0,0,0.5);
-        }
+/* Glassmorphism Classes */
+.glass {
+  background: var(--panel);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
 
-        /* Scrollbar */
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 10px; }
+.glass-glow {
+  border: 1px solid var(--border-strong);
+  box-shadow: 0 0 15px var(--primary-glow), inset 0 0 20px rgba(0, 229, 255, 0.05);
+}
 
-        header h1 {
-            font-weight: 800;
-            font-size: 2.2rem;
-            background: linear-gradient(90deg, var(--accent-cyan), #fff);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            letter-spacing: -1px;
-            margin-bottom: 0.2rem;
-        }
-        header p { color: var(--text-muted); font-size: 0.9rem; font-weight: 500; }
+/* Sidebar */
+.sidebar {
+  width: 280px;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  z-index: 10;
+  border-right: 1px solid var(--border);
+}
 
-        .card {
-            background: rgba(255, 255, 255, 0.02);
-            border: 1px solid var(--glass-border);
-            border-radius: 16px;
-            padding: 1.5rem;
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            position: relative;
-            overflow: hidden;
-        }
-        .card:hover {
-            background: rgba(255, 255, 255, 0.04);
-            border-color: rgba(0, 240, 255, 0.3);
-            transform: translateY(-2px);
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-        }
-        
-        .card::before {
-            content: '';
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 2px;
-            background: linear-gradient(90deg, transparent, var(--accent-cyan), transparent);
-            opacity: 0; transition: opacity 0.4s;
-        }
-        .card:hover::before { opacity: 1; }
+.logo { padding: 28px 24px 20px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+.logo h1 {
+  font-size: 1.8rem;
+  font-weight: 800;
+  background: linear-gradient(90deg, var(--primary), var(--blue));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  letter-spacing: -0.5px;
+  text-shadow: 0 0 20px var(--primary-glow);
+}
+.logo p { font-size: 0.75rem; color: var(--muted); margin-top: 6px; line-height: 1.5; font-weight: 500; }
 
-        .card-header {
-            display: flex; justify-content: space-between; align-items: center;
-            margin-bottom: 1rem;
-        }
-        .card-title { font-size: 1.1rem; font-weight: 600; color: #fff; }
+.nav { flex: 1; padding: 16px 0; overflow-y: auto; }
+.nav-item {
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 24px; cursor: pointer; transition: 0.3s;
+  color: var(--muted); font-size: 0.95rem; font-weight: 600;
+  border-left: 3px solid transparent;
+}
+.nav-item:hover { color: var(--text); background: rgba(0, 229, 255, 0.05); }
+.nav-item.active {
+  color: var(--primary);
+  background: linear-gradient(90deg, rgba(0,229,255,0.15), transparent);
+  border-left: 3px solid var(--primary);
+  text-shadow: 0 0 8px var(--primary-glow);
+}
 
-        .badge {
-            font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
-            padding: 0.3rem 0.6rem; border-radius: 20px; letter-spacing: 0.5px;
-        }
-        .badge.green { background: rgba(57, 255, 20, 0.15); color: var(--accent-green); }
-        .badge.magenta { background: rgba(255, 0, 127, 0.15); color: var(--accent-magenta); animation: pulse 2s infinite; }
-        .badge.cyan { background: rgba(0, 240, 255, 0.15); color: var(--accent-cyan); }
+/* Main */
+.main { flex: 1; overflow-y: auto; position: relative; z-index: 1; padding-bottom: 40px; }
+.topbar { display: flex; justify-content: space-between; align-items: center; padding: 24px 32px 10px; }
+.topbar h2 { font-size: 1.5rem; font-weight: 800; display: flex; align-items: center; gap: 12px; text-shadow: 0 0 10px rgba(255,255,255,0.2); }
+.status { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--primary); font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+.dot { width: 10px; height: 10px; border-radius: 50%; background: var(--green); box-shadow: 0 0 12px var(--green); }
 
-        @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(255,0,127,0.4); }
-            70% { box-shadow: 0 0 0 8px rgba(255,0,127,0); }
-            100% { box-shadow: 0 0 0 0 rgba(255,0,127,0); }
-        }
+.content { padding: 16px 32px 32px; }
 
-        /* Buttons & Inputs */
-        .btn {
-            background: rgba(255,255,255,0.05);
-            border: 1px solid var(--glass-border);
-            color: #fff; font-family: inherit; font-weight: 600; font-size: 0.85rem;
-            padding: 0.8rem 1.2rem; border-radius: 8px; cursor: pointer;
-            transition: all 0.3s; width: 100%; text-transform: uppercase;
-            letter-spacing: 1px; display: flex; justify-content: center; align-items: center; gap: 8px;
-        }
-        .btn:hover { background: rgba(255,255,255,0.1); border-color: #fff; }
-        .btn.primary { background: rgba(0, 240, 255, 0.1); border-color: var(--accent-cyan); color: var(--accent-cyan); }
-        .btn.primary:hover { background: var(--accent-cyan); color: #000; box-shadow: 0 0 20px rgba(0,240,255,0.4); }
-        .btn.danger { background: rgba(255, 0, 127, 0.1); border-color: var(--accent-magenta); color: var(--accent-magenta); }
-        .btn.danger:hover { background: var(--accent-magenta); color: #fff; box-shadow: 0 0 20px rgba(255,0,127,0.4); }
+.card {
+  background: var(--card);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  padding: 24px;
+  border: 1px solid var(--border);
+  margin-bottom: 24px;
+  transition: 0.3s;
+}
+.card:hover { border-color: rgba(0, 229, 255, 0.3); box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4); }
 
-        .btn-group { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
-        .btn-group .btn { padding: 0.5rem; font-size: 0.75rem; flex: 1; }
-        .btn-group .btn.active { background: var(--text-main); color: #000; border-color: var(--text-main); }
+.fiware-diagram {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 16px;
+  min-height: 620px;
+  padding: 22px;
+  border-radius: 18px;
+  overflow: hidden;
+  background: linear-gradient(180deg, rgba(4, 10, 24, 0.9), rgba(10, 16, 32, 0.96));
+  border: 1px solid var(--border);
+}
+.fiware-diagram::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at top, rgba(0, 229, 255, 0.1), transparent 45%),
+              linear-gradient(135deg, rgba(255,255,255,0.03), transparent 40%);
+  pointer-events: none;
+}
+.fiware-links {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.fiware-note {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  z-index: 2;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.32);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.75rem;
+  letter-spacing: 0.3px;
+}
+.fiware-node {
+  position: relative;
+  z-index: 1;
+  padding: 18px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(24, 33, 54, 0.95), rgba(10, 16, 30, 0.95));
+  border: 1px solid var(--border);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+  transition: 0.3s;
+}
+.fiware-node:hover {
+  transform: translateY(-3px);
+  border-color: rgba(0, 229, 255, 0.35);
+  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.45);
+}
+.fiware-node__title {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 10px;
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--text);
+}
+.fiware-node__title span { color: var(--primary); }
+.fiware-node__meta {
+  color: var(--muted);
+  font-size: 0.83rem;
+  line-height: 1.55;
+}
+.fiware-node__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+.fiware-chip {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: rgba(0, 229, 255, 0.1);
+  border: 1px solid rgba(0, 229, 255, 0.18);
+  color: #d8fbff;
+}
+.fiware-node--primary { grid-column: 4 / span 6; grid-row: 1; }
+.fiware-node--impact { grid-column: 1 / span 4; grid-row: 2; }
+.fiware-node--air { grid-column: 5 / span 4; grid-row: 2; }
+.fiware-node--forecast { grid-column: 9 / span 4; grid-row: 2; }
+.fiware-node--noise { grid-column: 1 / span 4; grid-row: 3; }
+.fiware-node--device { grid-column: 5 / span 4; grid-row: 3; }
+.fiware-node--model { grid-column: 9 / span 4; grid-row: 3; }
 
-        .llm-box {
-            background: rgba(0,0,0,0.4);
-            border-left: 3px solid var(--accent-cyan);
-            padding: 1rem; border-radius: 0 8px 8px 0;
-            font-size: 0.85rem; line-height: 1.6; color: #cbd5e1;
-            margin-top: 1rem; font-family: monospace;
-        }
+@media (max-width: 1100px) {
+  .fiware-diagram {
+    grid-template-columns: 1fr;
+    min-height: auto;
+    padding-top: 58px;
+  }
 
-        /* 3D Viewport */
-        .viewport-3d {
-            position: absolute;
-            bottom: 30px; right: 30px;
-            width: 350px; height: 250px;
-            background: var(--glass-bg);
-            backdrop-filter: blur(15px);
-            border: 1px solid var(--glass-border);
-            border-radius: 16px;
-            overflow: hidden;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.6);
-        }
-        .viewport-header {
-            position: absolute; top: 0; left: 0; width: 100%;
-            padding: 0.8rem 1rem; background: linear-gradient(180deg, rgba(0,0,0,0.8), transparent);
-            font-size: 0.8rem; font-weight: 700; color: var(--accent-cyan); letter-spacing: 1px; z-index: 2;
-        }
-        #canvas3d { width: 100%; height: 100%; }
+@media (max-width: 1100px) {
+  #app { flex-direction: column; height: auto; min-height: 100vh; width: 100%; }
+  .sidebar { width: 100%; min-height: auto; position: sticky; top: 0; z-index: 40; }
+  .nav { display: flex; gap: 8px; overflow-x: auto; overflow-y: hidden; padding: 12px 10px; }
+  .nav-item { flex: 0 0 auto; border-left: 0; border-radius: 10px; padding: 10px 14px; }
+  .main { width: 100%; overflow-y: visible; }
+  .content { padding: 14px; }
+  .dashboard-hero { flex-direction: column; gap: 14px; }
+  .hero-content { min-width: 0; }
+  .hero-mascot { width: 100%; max-width: 280px; height: 180px; }
+  .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+  .indicator-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .topbar { flex-direction: column; align-items: flex-start; gap: 10px; padding: 16px 14px 12px; }
+  .topbar > div { width: 100%; flex-wrap: wrap; }
+  .chart-box, #dash-map, #aw-map, #eco-map, #gs-map, #canvas3d { height: 280px !important; }
+  .fiware-diagram { min-height: 0; grid-template-columns: 1fr; }
+  .fiware-links { display: none; }
+  .fiware-node, .fiware-node--primary, .fiware-node--impact, .fiware-node--air, .fiware-node--forecast, .fiware-node--noise, .fiware-node--device, .fiware-node--model { grid-column: auto; grid-row: auto; }
+  .grafana-container iframe { min-height: 260px; }
+  .chat-widget { left: 10px; right: 10px; width: auto; bottom: 10px; }
+  .chat-msgs { max-height: 220px; }
+}
 
-        /* Notifications */
-        .notifications {
-            position: fixed; top: 30px; right: 30px;
-            display: flex; flex-direction: column; gap: 10px; z-index: 100;
-        }
-        .toast {
-            background: rgba(20, 25, 40, 0.9);
-            backdrop-filter: blur(10px);
-            border: 1px solid var(--accent-magenta);
-            border-left: 4px solid var(--accent-magenta);
-            color: #fff; padding: 1rem 1.5rem; border-radius: 8px;
-            box-shadow: 0 10px 30px rgba(255,0,127,0.2);
-            animation: slideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            max-width: 300px;
-        }
-        .toast h4 { margin-bottom: 0.3rem; font-size: 0.9rem; font-weight: 700; }
-        .toast p { font-size: 0.8rem; color: #cbd5e1; }
-        
-        @keyframes slideIn {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
+@media (max-width: 700px) {
+  .logo { padding: 18px 16px 12px; }
+  .logo h1 { font-size: 1.45rem; }
+  .nav-item { font-size: 0.9rem; }
+  .indicator-grid { grid-template-columns: 1fr; }
+  .hero-content p { font-size: 0.95rem; }
+  .mapbox { height: 300px; }
+  .chart-box { height: 250px; }
+  .chat-head { padding: 10px 12px; }
+  .chat-inp { padding: 10px; }
+  .chat-inp input { font-size: 16px; }
+  .msg { max-width: 86%; }
+}
+  .fiware-links { display: none; }
+  .fiware-node,
+  .fiware-node--primary,
+  .fiware-node--impact,
+  .fiware-node--air,
+  .fiware-node--forecast,
+  .fiware-node--noise,
+  .fiware-node--device,
+  .fiware-node--model {
+    grid-column: auto;
+    grid-row: auto;
+  }
+  .fiware-note {
+    position: static;
+    display: inline-flex;
+    margin-bottom: 16px;
+  }
+}
 
-        /* Stat Grid */
-        .stat-grid {
-            display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; margin-top: 1rem;
-        }
-        .stat-box {
-            background: rgba(0,0,0,0.3); padding: 0.8rem; border-radius: 8px;
-            border: 1px solid rgba(255,255,255,0.05); text-align: center;
-        }
-        .stat-val { font-size: 1.4rem; font-weight: 800; color: #fff; margin-bottom: 0.2rem; }
-        .stat-lbl { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 24px; }
+.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; }
 
-    </style>
+.kpi {
+  background: linear-gradient(180deg, rgba(30,40,64,0.8), rgba(20,25,40,0.8));
+  border-radius: 12px; padding: 24px; text-align: center;
+  border: 1px solid var(--border);
+  box-shadow: inset 0 0 20px rgba(0,229,255,0.02);
+}
+.kpi-val { font-size: 2.5rem; font-weight: 800; color: var(--primary); line-height: 1.1; text-shadow: 0 0 15px var(--primary-glow); }
+.kpi-lbl { font-size: 0.8rem; color: var(--muted); margin-top: 8px; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;}
+
+.badge { display: inline-flex; align-items: center; gap: 6px; background: rgba(0, 230, 118, 0.15); color: var(--green); border: 1px solid var(--green); border-radius: 20px; padding: 4px 12px; font-size: 0.75rem; font-weight: 700; box-shadow: 0 0 10px rgba(0,230,118,0.2); }
+.badge.red { background: rgba(255, 23, 68, 0.15); color: var(--red); border-color: var(--red); box-shadow: 0 0 10px rgba(255,23,68,0.2); }
+.badge.yellow { background: rgba(255, 234, 0, 0.15); color: var(--yellow); border-color: var(--yellow); box-shadow: 0 0 10px rgba(255,234,0,0.2); }
+.tag-green { color: var(--green); font-weight: bold; text-shadow: 0 0 8px rgba(0,230,118,0.5); }
+.tag-red { color: var(--red); font-weight: bold; text-shadow: 0 0 8px rgba(255,23,68,0.5); }
+.tag-yellow { color: var(--yellow); font-weight: bold; text-shadow: 0 0 8px rgba(255,234,0,0.5); }
+
+.mapbox { height: 420px; border-radius: 12px; overflow: hidden; border: 1px solid rgba(0,229,255,0.2); box-shadow: 0 0 20px rgba(0,0,0,0.5); }
+.chart-box { height: 280px; position: relative; }
+
+.indicator-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; margin-top: 16px; }
+.ind { background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; padding: 16px; text-align: center; }
+.ind-val { font-size: 1.6rem; font-weight: 800; text-shadow: 0 0 10px currentColor; }
+.ind-lbl { font-size: 0.75rem; color: var(--muted); margin-top: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+.zone-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-radius: 10px; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.05); margin-bottom: 10px; }
+
+/* Buttons & Inputs */
+.sel { background: rgba(0,0,0,0.3); border: 1px solid rgba(0,229,255,0.3); color: white; border-radius: 8px; padding: 12px 16px; font-family: inherit; font-size: 0.9rem; cursor: pointer; flex: 1; outline: none; transition: 0.3s; }
+.sel:focus { border-color: var(--primary); box-shadow: 0 0 10px var(--primary-glow); }
+
+.btn {
+  background: linear-gradient(90deg, rgba(0,229,255,0.1), rgba(0,119,255,0.1));
+  border: 1px solid var(--primary);
+  color: var(--primary);
+  border-radius: 8px; padding: 12px 24px; cursor: pointer; font-weight: 700; font-size: 0.9rem; transition: 0.3s;
+  text-transform: uppercase; letter-spacing: 1px;
+  box-shadow: 0 0 15px rgba(0,229,255,0.1);
+}
+.btn:hover { background: linear-gradient(90deg, var(--primary), var(--blue)); color: #fff; box-shadow: 0 0 25px rgba(0,229,255,0.6); border-color: transparent; }
+
+/* Mode buttons */
+.btn-mode {
+  background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); color: var(--muted);
+  border-radius: 8px; padding: 10px 16px; cursor: pointer; font-weight: 600; font-size: 0.9rem; transition: 0.3s;
+}
+.btn-mode.active {
+  background: rgba(0,229,255,0.2); border-color: var(--primary); color: var(--primary);
+  box-shadow: 0 0 15px var(--primary-glow);
+}
+
+.route-card { border-radius: 12px; padding: 18px; margin-bottom: 12px; border-left: 5px solid var(--green); background: rgba(0,0,0,0.2); border-top: 1px solid rgba(255,255,255,0.05); border-right: 1px solid rgba(255,255,255,0.05); border-bottom: 1px solid rgba(255,255,255,0.05); }
+.route-card.y { border-left-color: var(--yellow); }
+.route-card.r { border-left-color: var(--red); }
+
+/* Chat */
+.chat-widget { position: fixed; bottom: 30px; right: 30px; width: 340px; border-radius: 16px; overflow: hidden; border: 1px solid rgba(0,229,255,0.3); z-index: 9999; box-shadow: 0 15px 50px rgba(0,0,0,0.6), 0 0 20px var(--primary-glow); }
+.chat-head { background: linear-gradient(90deg, var(--blue), var(--primary)); padding: 16px 20px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-weight: 700; font-size: 1rem; color: #fff; }
+.chat-msgs { height: 300px; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; background: rgba(10,15,25,0.95); backdrop-filter: blur(10px); }
+.chat-inp { display: flex; padding: 14px; gap: 10px; background: rgba(20,25,40,0.95); border-top: 1px solid rgba(0,229,255,0.2); }
+.chat-inp input { flex: 1; background: rgba(0,0,0,0.3); border: 1px solid rgba(0,229,255,0.3); border-radius: 8px; padding: 10px 14px; color: white; font-family: inherit; font-size: 0.9rem; outline: none; }
+.chat-inp input:focus { box-shadow: 0 0 10px var(--primary-glow); }
+.chat-inp button { background: linear-gradient(135deg, var(--primary), var(--blue)); border: none; border-radius: 8px; width: 44px; height: 44px; cursor: pointer; font-size: 1.2rem; display: flex; align-items: center; justify-content: center; color: white; box-shadow: 0 0 10px var(--primary-glow); }
+.msg { padding: 12px 16px; border-radius: 12px; font-size: 0.9rem; line-height: 1.5; max-width: 72%; }
+.msg-u { align-self: flex-end; background: rgba(255,255,255,0.1); color: var(--text); border: 1px solid rgba(255,255,255,0.1); border-bottom-right-radius: 4px; }
+.msg-b { align-self: flex-start; background: rgba(0,229,255,0.15); color: var(--text); border: 1px solid rgba(0,229,255,0.3); border-bottom-left-radius: 4px; box-shadow: 0 0 10px rgba(0,229,255,0.1); }
+
+/* Chat message layout */
+.chat-row { display:flex; gap:10px; align-items:flex-end; }
+.chat-row.row-user { justify-content:flex-end; }
+.chat-row.row-assistant { justify-content:flex-start; }
+.chat-avatar { width:36px; height:36px; border-radius:8px; object-fit:contain; box-shadow: 0 6px 18px rgba(0,0,0,0.35); }
+
+/* Dashboard mascot (decorative) */
+.dashboard-mascot { position: absolute; top: 12px; right: 18px; width:120px; height:120px; pointer-events: none; opacity: 0.96; transform: translateZ(0); transition: transform 0.28s ease, opacity 0.28s ease; filter: drop-shadow(0 12px 30px rgba(0,0,0,0.25)); }
+@media (max-width:900px) {
+  .dashboard-mascot { width:80px; height:80px; top:8px; right:8px; opacity:0.9; }
+}
+.dashboard-mascot:hover { transform: translateY(-6px) scale(1.02); }
+
+/* Dashboard hero integrated mascot */
+.dashboard-hero { display:flex; gap:28px; align-items:center; position:relative; padding:28px; }
+.hero-content { flex:1; min-width:220px; }
+.hero-content h3 { margin:0 0 8px 0; }
+.hero-content p { margin:0; color:var(--muted); }
+.hero-mascot { width:220px; height:220px; position:relative; display:flex; align-items:center; justify-content:center; }
+.mascot-plate { display:none; }
+.mascot-plate img { display:none; }
+/* Hero image fills the right side */
+.hero-mascot { flex: 0 0 38%; display:flex; align-items:stretch; justify-content:center; position:relative; }
+.hero-image { width:100%; height:100%; object-fit:cover; border-radius:12px; box-shadow: 0 20px 60px rgba(2,6,23,0.35); transform: translateY(10px); }
+
+/* entry + float animation */
+@keyframes heroEntry { from { transform: translateX(30px) scale(0.98); opacity:0 } to { transform: translateX(0) scale(1); opacity:1 } }
+@keyframes heroFloat { 0% { transform: translateY(0) } 50% { transform: translateY(-6px) } 100% { transform: translateY(0) } }
+.hero-image.animate { animation: heroEntry 700ms cubic-bezier(.2,.9,.3,1) both, heroFloat 6s ease-in-out 900ms infinite; }
+@media (max-width:900px) {
+  .dashboard-hero { flex-direction:column; gap:12px; padding:18px; }
+  .hero-mascot { width:120px; height:120px; }
+  .mascot-plate { width:100px; height:100px; border-radius:14px; }
+  .hero-bubble { display:none; }
+}
+
+@media (max-width: 1100px) {
+  #app { flex-direction: column; height: auto; min-height: 100vh; }
+  .sidebar { width: 100%; position: sticky; top: 0; z-index: 30; }
+  .nav { display: flex; gap: 8px; overflow-x: auto; overflow-y: hidden; padding: 12px 8px; }
+  .nav-item { flex: 0 0 auto; padding: 10px 14px; border-left: 0; border-radius: 10px; }
+  .main { overflow-y: visible; }
+  .content { padding: 12px 14px 18px; }
+  .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; gap: 14px; }
+  .dashboard-hero { flex-direction: column; gap: 14px; padding: 18px; }
+  .hero-mascot { width: 100%; max-width: 220px; height: 180px; }
+  .indicator-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .topbar { flex-direction: column; align-items: flex-start; gap: 12px; padding: 18px 14px 12px; }
+  .topbar > div { width: 100%; flex-wrap: wrap; }
+  .chart-box, #dash-map, #aw-map, #eco-map, #gs-map, #canvas3d { height: 280px !important; }
+  .card, .kpi, .route-card, .achievement, .zone-row, .sel, .btn-mode, .chat-widget { box-shadow: var(--shadow); }
+  .chat-widget { width: calc(100% - 16px); right: 8px; left: 8px; bottom: 8px; }
+  .chat-msgs { max-height: 220px; }
+  .msg { max-width: 86%; }
+}
+
+@media (max-width: 700px) {
+  .sidebar { padding-bottom: 8px; }
+  .logo { padding: 18px 16px 12px; }
+  .logo h1 { font-size: 1.45rem; }
+  .nav-item { font-size: 0.9rem; }
+  .indicator-grid { grid-template-columns: 1fr; }
+  .hero-content p { font-size: 0.95rem; }
+  .hero-image { min-height: 160px; object-fit: cover; }
+  .chat-head { padding: 10px 12px; }
+  .chat-inp { padding: 10px; }
+  .chat-inp input { font-size: 16px; }
+}
+
+/* Profile */
+.profile-avatar { width: 110px; height: 110px; border-radius: 8px; background: url('mascot.png') center/contain no-repeat, linear-gradient(135deg, #a855f7, var(--primary)); display: flex; align-items: center; justify-content: center; font-size: 2.5rem; box-shadow: 0 0 20px rgba(168,85,247,0.35); border: 2px solid rgba(255,255,255,0.06); overflow: visible; }
+.achievement { background: rgba(0,0,0,0.2); border: 1px solid rgba(0,230,118,0.3); border-radius: 12px; padding: 20px; text-align: center; box-shadow: inset 0 0 20px rgba(0,230,118,0.05); transition: 0.3s; }
+.achievement:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,230,118,0.15), inset 0 0 20px rgba(0,230,118,0.1); border-color: var(--green); }
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-thumb { background: rgba(0,229,255,0.3); border-radius: 6px; }
+::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); }
+
+/* LIGHT MODE VARIABLES */
+body.light-mode {
+  --bg: #eef3f9;
+  --panel: rgba(255, 255, 255, 0.78);
+  --card: rgba(255, 255, 255, 0.9);
+  --surface: rgba(255, 255, 255, 0.86);
+  --surface-strong: rgba(255, 255, 255, 0.96);
+  --border: rgba(148, 163, 184, 0.28);
+  --border-strong: rgba(2, 132, 199, 0.24);
+  --text: #0f172a;
+  --muted: #64748b;
+  --primary-glow: rgba(0, 119, 255, 0.24);
+  --shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
+}
+body.light-mode .sidebar { background: rgba(255,255,255,0.55); }
+body.light-mode .logo { border-bottom-color: var(--border); }
+body.light-mode .nav-item { color: #475569; }
+body.light-mode .nav-item:hover { color: #0f172a; background: rgba(0, 229, 255, 0.08); }
+body.light-mode .nav-item.active { background: linear-gradient(90deg, rgba(0,229,255,0.18), transparent); }
+body.light-mode .logo h1 { text-shadow: none; }
+body.light-mode .glass,
+body.light-mode .card,
+body.light-mode .kpi,
+body.light-mode .zone-row,
+body.light-mode .route-card,
+body.light-mode .achievement,
+body.light-mode .sel,
+body.light-mode .btn-mode,
+body.light-mode .chat-widget {
+  box-shadow: var(--shadow);
+}
+body.light-mode .card,
+body.light-mode .kpi,
+body.light-mode .zone-row,
+body.light-mode .route-card,
+body.light-mode .achievement,
+body.light-mode .sel,
+body.light-mode .btn-mode,
+body.light-mode .chat-widget,
+body.light-mode .fiware-node,
+body.light-mode .fiware-note {
+  border-color: var(--border);
+}
+body.light-mode .chat-widget { background: rgba(255,255,255,0.7); }
+body.light-mode .chat-head { filter: saturate(0.92) brightness(1.05); }
+body.light-mode .chat-msgs { background: rgba(248,250,252,0.96); }
+body.light-mode .chat-inp { background: rgba(241,245,249,0.96); border-top-color: var(--border); }
+body.light-mode .chat-inp input { background: #fff; color: #0f172a; border-color: var(--border); }
+body.light-mode .msg-u { background: #fff; border: 1px solid var(--border); border-bottom-right-radius: 4px; }
+body.light-mode .msg-b { background: rgba(0,229,255,0.08); border: 1px solid rgba(0,229,255,0.26); color: #0f172a; border-bottom-left-radius: 4px;}
+body.light-mode .fiware-diagram { background: linear-gradient(180deg, rgba(255,255,255,0.92), rgba(241,245,249,0.94)); }
+body.light-mode .fiware-node { background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(241,245,249,0.96)); }
+body.light-mode .fiware-node__meta { color: #475569; }
+body.light-mode .fiware-chip { color: #0f172a; background: rgba(0,229,255,0.08); }
+body.light-mode .fiware-note { background: rgba(255,255,255,0.7); }
+body.light-mode .urbs-tooltip { background: rgba(255,255,255,0.96) !important; color: #0f172a !important; border: 1px solid var(--border) !important; box-shadow: var(--shadow) !important; }
+body.light-mode .urbs-tooltip::before { border-top-color: var(--border) !important; }
+body.light-mode .sel { background: rgba(255,255,255,0.88); color: #0f172a; }
+body.light-mode .btn { color: #0f172a; }
+body.light-mode .btn:hover { color: #fff; }
+body.light-mode .btn-mode { background: rgba(255,255,255,0.8); color: #475569; }
+body.light-mode .btn-mode.active { background: rgba(0,229,255,0.18); color: #0f172a; }
+body.light-mode .kpi { background: rgba(255,255,255,0.96); }
+body.light-mode .card { background: rgba(255,255,255,0.9); }
+body.light-mode .glass { background: rgba(255,255,255,0.72); }
+body.light-mode .achievement { background: rgba(255,255,255,0.9); }
+body.light-mode .route-card, body.light-mode .zone-row { background: rgba(255,255,255,0.82); }
+
+/* MASCOT */
+.mascot { width: 50px; height: 50px; border-radius: 50%; border: 2px solid var(--primary); object-fit: cover; background: #fff; }
+.chat-mascot { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; background: #fff; margin-right: 8px;}
+
+/* MAP TOOLTIP */
+.urbs-tooltip { background: var(--panel) !important; color: var(--text) !important; border: 1px solid var(--primary) !important; border-radius: 8px !important; font-family: 'Inter', sans-serif !important; font-weight: 600; box-shadow: 0 0 10px var(--primary-glow) !important; padding: 10px !important; font-size: 0.9rem !important;}
+.urbs-tooltip::before { border-top-color: var(--primary) !important; }
+
+/* PROFILE EDIT */
+.profile-avatar { transition: transform 0.22s ease, box-shadow 0.22s ease; cursor: pointer; transform-origin: center; }
+.profile-avatar:hover,
+.profile-avatar.is-zoomed { transform: scale(1.32); box-shadow: 0 0 34px rgba(168,85,247,0.55), 0 0 18px rgba(0,229,255,0.28); z-index: 3; }
+.edit-input { background: rgba(0,0,0,0.3); border: 1px solid var(--primary); color: var(--text); border-radius: 4px; padding: 4px 8px; font-family: inherit; font-size: inherit; font-weight: inherit; outline: none; }
+body.light-mode .edit-input { background: #fff; color: #000; }
+</style>
 </head>
-<body>
-    <div id="map"></div>
-
-    <div id="app">
-        <!-- Sidebar -->
-        <aside class="sidebar ui-element">
-            <header>
-                <h1>URBS</h1>
-                <p>A Coruña • Smart Biosphere</p>
-            </header>
-
-            <!-- Module 1: GreenRoute -->
-            <div class="card">
-                <div class="card-header">
-                    <span class="card-title">GreenRoute</span>
-                    <span class="badge green">Navegación</span>
-                </div>
-                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">Calcula rutas óptimas de bajo impacto combinando polución, ruido y densidad peatonal.</p>
-                
-                <div style="display:flex; gap: 10px; margin-bottom: 1rem;">
-                    <select v-model="selectedOrigin" class="btn" style="flex:1; background:rgba(0,0,0,0.5);">
-                        <option value="">Origen (Opcional)</option>
-                        <option v-for="seg in availableSegments" :value="seg">Tramo {{ seg.replace('Coruna-Segment-','') }}</option>
-                    </select>
-                    <select v-model="selectedDestination" class="btn" style="flex:1; background:rgba(0,0,0,0.5);">
-                        <option value="">Destino (Opcional)</option>
-                        <option v-for="seg in availableSegments" :value="seg">Tramo {{ seg.replace('Coruna-Segment-','') }}</option>
-                    </select>
-                </div>
-                
-                <div class="btn-group">
-                    <button class="btn" :class="{active: activeLayer === 'salubrity'}" @click="setLayer('salubrity')">Índice</button>
-                    <button class="btn" :class="{active: activeLayer === 'no2'}" @click="setLayer('no2')">NO₂</button>
-                    <button class="btn" :class="{active: activeLayer === 'noise'}" @click="setLayer('noise')">Ruido</button>
-                </div>
-
-                <button class="btn primary" @click="fetchRoute">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>
-                    Actualizar Mapa Base
-                </button>
-            </div>
-
-            <!-- Module 2: UrbanPulse -->
-            <div class="card">
-                <div class="card-header">
-                    <span class="card-title">UrbanPulse</span>
-                    <span class="badge cyan">Real-Time</span>
-                </div>
-                <canvas id="pulseChart" width="100%" height="60"></canvas>
-                
-                <div class="llm-box">
-                    <div style="display:flex; align-items:center; gap:8px; margin-bottom: 8px;">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent-cyan)" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-                        <strong style="color:var(--accent-cyan); font-family: 'Inter'">AI Insights</strong>
-                    </div>
-                    {{ llmExplanation }}
-                </div>
-                <div style="margin-top: 1rem;">
-                    <a href="http://localhost:3000" target="_blank" class="btn" style="text-decoration:none;">Abrir Dashboard Grafana</a>
-                </div>
-            </div>
-
-            <!-- Module 3: EcoZones -->
-            <div class="card">
-                <div class="card-header">
-                    <span class="card-title">EcoZones (ZBE)</span>
-                    <span class="badge" :class="zbeActive ? 'magenta' : 'green'">{{ zbeActive ? 'ALERTA' : 'NORMAL' }}</span>
-                </div>
-                
-                <div class="stat-grid" style="margin-bottom: 1rem;">
-                    <div class="stat-box">
-                        <div class="stat-val" :style="{color: currentAvgNo2 > 50 ? 'var(--accent-magenta)' : '#fff'}">{{ currentAvgNo2 }}</div>
-                        <div class="stat-lbl">Media NO₂ (µg/m³)</div>
-                    </div>
-                    <div class="stat-box">
-                        <div class="stat-val">{{ zbeActive ? 'RESTRINGIDO' : 'LIBRE' }}</div>
-                        <div class="stat-lbl">Estado Tráfico</div>
-                    </div>
-                </div>
-
-                <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem;">Gestión dinámica de Zonas de Bajas Emisiones. Corta el tráfico automáticamente ante picos severos.</p>
-                
-                <button class="btn" :class="zbeActive ? 'danger' : 'primary'" @click="toggleZBE">
-                    {{ zbeActive ? 'Desactivar ZBE' : 'Activar ZBE Dinámica' }}
-                </button>
-            </div>
-        </aside>
-
-        <!-- 3D Viewport -->
-        <div class="viewport-3d ui-element">
-            <div class="viewport-header">● VISTA VOLUMÉTRICA</div>
-            <div id="canvas3d"></div>
+<body :class="{'light-mode': isLight}">
+<div id="app">
+  <div class="sidebar glass" style="display:flex; flex-direction:column; justify-content:space-between;">
+    <div>
+      <div class="logo" style="display:flex; align-items:center; gap:12px;">
+        <img src="mascot.png" class="mascot" alt="Mascota">
+        <div>
+          <h1 style="font-size:1.4rem;">UrbanPulse</h1>
+          <p>{{ t('subtitle') }}</p>
         </div>
-
-        <!-- Notifications -->
-        <div class="notifications ui-element">
-            <div v-for="notif in notifications" :key="notif.id" class="toast">
-                <h4>{{ notif.title }}</h4>
-                <p>{{ notif.message }}</p>
-            </div>
-        </div>
+      </div>
+      <div class="nav">
+        <div class="nav-item" :class="{active:tab==='dashboard'}" @click="tab='dashboard'">📊 {{ t('navDash') }}</div>
+        <div class="nav-item" :class="{active:tab==='airwatch'}" @click="tab='airwatch'">🌫️ {{ t('navAir') }}</div>
+        <div class="nav-item" :class="{active:tab==='ecoruta'}" @click="tab='ecoruta'">🌿 {{ t('navEco') }}</div>
+        <div class="nav-item" :class="{active:tab==='greenscore'}" @click="tab='greenscore'">🏆 {{ t('navGreen') }}</div>
+        <div class="nav-item" :class="{active:tab==='perfil'}" @click="tab='perfil'">👤 {{ t('navProfile') }}</div>
+      </div>
     </div>
+    <div style="padding: 20px; border-top: 1px solid rgba(0,229,255,0.2); display:flex; gap:10px; flex-direction:column;">
+      <button class="btn-mode" @click="isLight=!isLight">{{ isLight ? t('darkBtn') : t('lightBtn') }}</button>
+      <button class="btn-mode" @click="lang = lang==='es'?'en':'es'">🌐 {{ lang.toUpperCase() }}</button>
+    </div>
+  </div>
+  <div class="main">
+    <div class="topbar">
+      <h2>
+        <span v-if="tab==='dashboard'">📊 {{ t('dashTitle') }}</span>
+        <span v-if="tab==='airwatch'">🌫️ {{ t('airTitle') }}</span>
+        <span v-if="tab==='ecoruta'">🌿 {{ t('ecoTitle') }}</span>
+        <span v-if="tab==='greenscore'">🏆 {{ t('gsTitle') }}</span>
+        <span v-if="tab==='perfil'">👤 {{ t('profTitle') }}</span>
+      </h2>
+      <div style="display:flex; gap:16px; align-items:center;">
+        <div class="status"><div class="dot"></div> {{ t('sysActive') }}</div>
+        <div style="background:var(--panel); border-radius:8px; display:flex; border:1px solid var(--border); overflow:hidden;">
+          <button style="border:none; padding:8px 12px; cursor:pointer; font-weight:bold; color:var(--text); background:transparent; transition:0.3s;" :style="viewMode==='ciudadano'?'background:var(--primary);color:#000':''" @click="viewMode='ciudadano'">{{ t('modeC') }}</button>
+          <button style="border:none; padding:8px 12px; cursor:pointer; font-weight:bold; color:var(--text); background:transparent; transition:0.3s;" :style="viewMode==='alcalde'?'background:var(--primary);color:#000':''" @click="viewMode='alcalde'">{{ t('modeA') }}</button>
+        </div>
+      </div>
+    </div>
+    <div class="content">
 
-    <script>
-        const { createApp, ref, onMounted } = Vue;
+      <!-- ===== DASHBOARD ===== -->
+      <div v-show="tab==='dashboard'">
+        <!-- Intro Section -->
+        <div class="card glass-glow dashboard-hero" style="background: linear-gradient(135deg, rgba(0,229,255,0.04) 0%, rgba(0,0,0,0.18) 100%); position:relative; overflow:visible;">
+          <div style="position:absolute; top:-50px; right:-50px; width:200px; height:200px; background:var(--primary); filter:blur(100px); opacity:0.06; border-radius:50%;"></div>
+          <div class="hero-content">
+            <h3 style="color:var(--primary); font-size:1.6rem; margin-bottom:8px; font-weight:800; display:flex; align-items:center; gap:10px;">{{ t('welcome') }}</h3>
+            <div class="hero-tagline" style="margin-bottom:12px;color:var(--muted);font-weight:600">{{ heroPhrase }}</div>
+            <p style="font-size:1rem; line-height:1.6; color:var(--text); max-width:720px;">{{ t('welcomeSub') }}<br><br>
+              <b style="color:var(--text)">{{ t('howTo') }}</b><br>
+              <span style="color:var(--primary)">•</span> <b>AirWatch</b>: {{ t('descAir') }}<br>
+              <span style="color:var(--primary)">•</span> <b>EcoRuta</b>: {{ t('descEco') }}<br>
+              <span style="color:var(--primary)">•</span> <b>GreenScore</b>: {{ t('descGS') }}</p>
+          </div>
+          <div class="hero-mascot" aria-hidden="true">
+            <img src="mascot.png" class="hero-image" :class="{animate: mascotAnimate}" alt="Mascota">
+          </div>
+        </div>
 
-        createApp({
-            setup() {
-                const mapInstance = ref(null);
-                const mapLayers = ref([]);
-                const activeLayer = ref('salubrity');
-                const zbeActive = ref(false);
-                const currentAvgNo2 = ref(45);
-                const llmExplanation = ref("Analizando patrones de tráfico y correlación atmosférica...");
-                const notifications = ref([]);
-                const selectedOrigin = ref("");
-                const selectedDestination = ref("");
-                const availableSegments = ref(["Coruna-Segment-1","Coruna-Segment-2","Coruna-Segment-3","Coruna-Segment-4","Coruna-Segment-5","Coruna-Segment-6","Coruna-Segment-7","Coruna-Segment-8","Coruna-Segment-9","Coruna-Segment-10"]);
-                let notifId = 0;
-                let chartInstance = null;
+        <div class="grid-4" style="margin-bottom:24px">
+          <div class="kpi"><div class="kpi-val">{{ dash.avgAqi }}</div><div class="kpi-lbl">{{ t('kpiAqi') }}</div></div>
+          <div class="kpi"><div class="kpi-val">{{ dash.avgTraffic }}</div><div class="kpi-lbl">{{ t('kpiTraffic') }}</div></div>
+          <div class="kpi"><div class="kpi-val" style="color:var(--red); text-shadow:0 0 15px rgba(255,23,68,0.5);">{{ dash.alertCount }}</div><div class="kpi-lbl">{{ t('kpiAlerts') }}</div></div>
+          <div class="kpi"><div class="kpi-val" style="color:var(--green); text-shadow:0 0 15px rgba(0,230,118,0.5);">{{ dash.avgGreenScore }}</div><div class="kpi-lbl">{{ t('kpiGS') }}</div></div>
+        </div>
+        <div class="grid-2">
+          <div class="card">
+            <h3 style="margin-bottom:16px;font-size:1.1rem;color:var(--primary)">{{ t('mapRt') }}</h3>
+            <div id="dash-map" class="mapbox"></div>
+          </div>
+          <div class="card">
+            <h3 style="margin-bottom:16px;font-size:1.1rem;color:var(--primary)">{{ t('alertsAc') }}</h3>
+            <div v-if="dash.alerts && dash.alerts.length">
+              <div v-for="a in dash.alerts" :key="a.zone" class="zone-row">
+                <span style="font-weight:600">{{ a.zone }}</span>
+                <span><span class="badge red">NO₂ {{ a.no2 }} µg/m³</span></span>
+              </div>
+            </div>
+            <div v-else style="color:var(--muted);font-size:0.95rem; padding:20px; text-align:center; background:var(--panel); border-radius:10px;">
+              {{ t('noAlerts') }}
+            </div>
+            <div style="margin-top:24px">
+              <h3 style="font-size:0.9rem;margin-bottom:12px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;">{{ t('syncTitle') }}</h3>
+              <div v-for="z in zonas.slice(0,5)" :key="z.id" style="display:flex;justify-content:space-between;font-size:0.85rem;padding:8px 0;border-bottom:1px solid var(--border)">
+                <span style="color:#e2e8f0">{{ z.name }}</span>
+                <span style="color:var(--primary); font-family:monospace">{{ formatTs(z.timestamp) }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <h3 style="margin-bottom:16px;font-size:1.1rem;color:var(--primary)">{{ t('arqTitle') }}</h3>
+          <div class="fiware-diagram" aria-label="Diagrama visual de entidades FIWARE y sus relaciones">
+            <div class="fiware-note">{{ t('fiwareNote') }}</div>
+            <svg class="fiware-links" viewBox="0 0 1200 760" preserveAspectRatio="none" aria-hidden="true">
+              <defs>
+                <linearGradient id="fiware-line" x1="0" x2="1" y1="0" y2="0">
+                  <stop offset="0%" stop-color="#00e5ff" stop-opacity="0.95"></stop>
+                  <stop offset="100%" stop-color="#00a3ff" stop-opacity="0.9"></stop>
+                </linearGradient>
+                <marker id="fiware-arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
+                  <path d="M0,0 L12,6 L0,12 z" fill="#00e5ff"></path>
+                </marker>
+              </defs>
+              <path d="M600 182 C600 238 380 238 250 314" fill="none" stroke="url(#fiware-line)" stroke-width="4" stroke-linecap="round" marker-end="url(#fiware-arrow)"/>
+              <path d="M600 182 C600 238 820 238 950 314" fill="none" stroke="url(#fiware-line)" stroke-width="4" stroke-linecap="round" marker-end="url(#fiware-arrow)"/>
+              <path d="M726 628 C820 628 888 628 982 628" fill="none" stroke="url(#fiware-line)" stroke-width="4" stroke-linecap="round" marker-end="url(#fiware-arrow)"/>
+            </svg>
+            <section class="fiware-node fiware-node--primary">
+              <div class="fiware-node__title"><span>TrafficFlowObserved</span><span>{{ t('fiwareBase') }}</span></div>
+              <div class="fiware-node__meta">{{ t('fiwareTrafficMeta') }}</div>
+              <div class="fiware-node__chips">
+                <span class="fiware-chip">intensity</span>
+                <span class="fiware-chip">averageVehicleSpeed</span>
+                <span class="fiware-chip">occupancy</span>
+              </div>
+            </section>
+            <section class="fiware-node fiware-node--impact">
+              <div class="fiware-node__title"><span>TrafficEnvironmentImpact</span><span>{{ t('fiwareImpact') }}</span></div>
+              <div class="fiware-node__meta">{{ t('fiwareImpactMeta') }}</div>
+              <div class="fiware-node__chips">
+                <span class="fiware-chip">NO2Concentration</span>
+                <span class="fiware-chip">PM25Concentration</span>
+                <span class="fiware-chip">noiseLevel</span>
+              </div>
+            </section>
+            <section class="fiware-node fiware-node--air">
+              <div class="fiware-node__title"><span>AirQualityObserved</span><span>{{ t('fiwareQuality') }}</span></div>
+              <div class="fiware-node__meta">{{ t('fiwareAirMeta') }}</div>
+              <div class="fiware-node__chips">
+                <span class="fiware-chip">NO2</span>
+                <span class="fiware-chip">PM2.5</span>
+                <span class="fiware-chip">PM10</span>
+                <span class="fiware-chip">CO2</span>
+                <span class="fiware-chip">airQualityIndex</span>
+              </div>
+            </section>
+            <section class="fiware-node fiware-node--forecast">
+              <div class="fiware-node__title"><span>TrafficEnvironmentImpactForecast</span><span>{{ t('fiwareForecast') }}</span></div>
+              <div class="fiware-node__meta">{{ t('fiwareForecastMeta') }}</div>
+              <div class="fiware-node__chips">
+                <span class="fiware-chip">hoursAhead</span>
+                <span class="fiware-chip">NO2Concentration</span>
+                <span class="fiware-chip">PM25Concentration</span>
+              </div>
+            </section>
+            <section class="fiware-node fiware-node--noise">
+              <div class="fiware-node__title"><span>NoiseLevelObserved</span><span>{{ t('fiwareNoise') }}</span></div>
+              <div class="fiware-node__meta">{{ t('fiwareNoiseMeta') }}</div>
+              <div class="fiware-node__chips">
+                <span class="fiware-chip">loudness</span>
+                <span class="fiware-chip">dateObserved</span>
+              </div>
+            </section>
+            <section class="fiware-node fiware-node--device">
+              <div class="fiware-node__title"><span>Device</span><span>{{ t('fiwareOrigin') }}</span></div>
+              <div class="fiware-node__meta">{{ t('fiwareDeviceMeta') }}</div>
+              <div class="fiware-node__chips">
+                <span class="fiware-chip">id</span>
+                <span class="fiware-chip">category</span>
+                <span class="fiware-chip">refDeviceModel</span>
+              </div>
+            </section>
+            <section class="fiware-node fiware-node--model">
+              <div class="fiware-node__title"><span>DeviceModel</span><span>{{ t('fiwareCatalog') }}</span></div>
+              <div class="fiware-node__meta">{{ t('fiwareModelMeta') }}</div>
+              <div class="fiware-node__chips">
+                <span class="fiware-chip">id</span>
+                <span class="fiware-chip">brandName</span>
+              </div>
+            </section>
+          </div>
+        </div>
+        <div class="card">
+          <h3 style="margin-bottom:16px;font-size:1.1rem;color:var(--primary)">Grafana Dashboards</h3>
+          <p style="margin-bottom:12px;color:var(--muted);">Panel embebido con series temporales de tráfico y calidad del aire.</p>
+          <div class="grafana-container" style="height:420px;border-radius:12px;overflow:hidden;border:1px solid var(--border);background:var(--panel);">
+            <iframe src="http://localhost:3000/d/urbs-dashboard/urbs-panel-de-bienestar-urbano-a-coruc3b1-a?orgId=1&kiosk" frameborder="0" style="width:100%;height:100%;border:0;"></iframe>
+          </div>
+        </div>
+      </div>
 
-                const notify = (title, message) => {
-                    const id = notifId++;
-                    notifications.value.push({ id, title, message });
-                    setTimeout(() => {
-                        notifications.value = notifications.value.filter(n => n.id !== id);
-                    }, 5000);
-                    // Native Push Notification
-                    if (Notification.permission === 'granted') {
-                        new Notification(title, { body: message });
-                    }
-                };
+      <!-- ===== AIRWATCH ===== -->
+      <div v-show="tab==='airwatch'">
+        <div style="margin:12px 0; display:flex; gap:8px; align-items:center;">
+          <label style="color:var(--muted); font-size:0.9rem;">Zona:</label>
+          <select id="zoneSelect" class="sel">
+            <option value="global">Global</option>
+          </select>
+        </div>
+        <div class="indicator-grid">
+          <div class="ind" v-for="ind in indicators" :key="ind.label">
+            <div class="ind-val" :style="{color: ind.color}">{{ ind.value }}</div>
+            <div class="ind-lbl">{{ ind.label }}</div>
+          </div>
+        </div>
+        <div class="grid-2" style="margin-top:24px">
+          <div class="card">
+            <h3 style="margin-bottom:14px;font-size:1.05rem;color:var(--primary)">{{ t('indTitle') }}</h3>
+            <div id="aw-map" style="height:320px;border-radius:10px;overflow:hidden;border:1px solid rgba(0,229,255,0.2)"></div>
+          </div>
+          <div class="card">
+            <h3 style="margin-bottom:14px;font-size:1.05rem;color:var(--primary)">{{ t('corrTitle') }}</h3>
+            <div class="chart-box"><canvas id="scatter-chart"></canvas></div>
+          </div>
+        </div>
+        <div class="card glass-glow">
+          <h3 style="margin-bottom:14px;font-size:1.1rem;color:var(--primary);text-shadow:0 0 10px var(--primary-glow)">{{ t('volTitle') }}</h3>
+          <div id="canvas3d" style="height:420px;border-radius:12px;overflow:hidden;background:#030712;border:1px solid rgba(0,229,255,0.2);box-shadow:inset 0 0 40px rgba(0,0,0,0.8)"></div>
+          <p style="font-size:0.8rem; color:var(--muted); margin-top:10px; text-align:center;">{{ t('volDesc') }}</p>
+        </div>
+        <div class="card">
+          <h3 style="margin-bottom:14px;font-size:1.05rem;color:var(--primary)">{{ t('predTitle') }}</h3>
+          <div style="margin-bottom:12px; display:flex; gap:8px; align-items:center;">
+            <label style="color:var(--muted); font-size:0.85rem;">Zona prediccion:</label>
+            <select id="forecastZoneSelect" class="sel" style="max-width:280px;">
+              <option value="all">Todas las zonas</option>
+            </select>
+          </div>
+          <div class="chart-box" style="height:300px;"><canvas id="forecast-chart"></canvas></div>
+        </div>
+      </div>
 
-                const initMap = () => {
-                    mapInstance.value = L.map('map', { zoomControl: false }).setView([43.365, -8.41], 14);
-                    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-                        attribution: '© CARTO'
-                    }).addTo(mapInstance.value);
-                    L.control.zoom({ position: 'topright' }).addTo(mapInstance.value);
-                };
+      <!-- ===== ECORUTA ===== -->
+      <div v-show="tab==='ecoruta'">
+        <div class="card glass-glow">
+          <h3 style="margin-bottom:20px;font-size:1.2rem;color:var(--primary)">{{ t('ecoPlan') }}</h3>
 
-                const fetchRoute = async () => {
-                    try {
-                        mapLayers.value.forEach(l => mapInstance.value.removeLayer(l));
-                        mapLayers.value = [];
-                        
-                        let url = '/api/route';
-                        if (selectedOrigin.value && selectedDestination.value) {
-                            url += `?origin=${selectedOrigin.value}&destination=${selectedDestination.value}`;
-                        }
-                        
-                        const res = await fetch(url);
-                        const data = await res.json();
-                        
-                        let totalNo2 = 0;
-                        let latlngs = [];
+          <div style="display:flex; gap:12px; margin-bottom:20px; flex-wrap:wrap">
+            <button class="btn-mode" :class="{active: tMode==='car'}" @click="tMode='car'">{{ t('ecoCar') }} (30km/h)</button>
+            <button class="btn-mode" :class="{active: tMode==='bus'}" @click="tMode='bus'">{{ t('ecoBus') }} (20km/h)</button>
+            <button class="btn-mode" :class="{active: tMode==='bike'}" @click="tMode='bike'">{{ t('ecoBike') }} (15km/h)</button>
+            <button class="btn-mode" :class="{active: tMode==='walk'}" @click="tMode='walk'">{{ t('ecoWalk') }} (5km/h)</button>
+          </div>
 
-                        data.route.forEach(seg => {
-                            totalNo2 += seg.no2;
-                            let color = seg.color;
-                            let val = seg.salubrityIndex;
-                            let label = 'Salubridad';
+          <div style="display:flex;gap:16px;margin-bottom:20px;flex-wrap:wrap">
+            <select class="sel" v-model="ecoOrigen">
+              <option value="">{{ t('ecoOrig') }}</option>
+              <option v-for="z in zonas" :key="z.id" :value="z.id">{{ z.name }}</option>
+            </select>
+            <span style="display:flex;align-items:center;color:var(--primary)">➔</span>
+            <select class="sel" v-model="ecoDest">
+              <option value="">{{ t('ecoDest') }}</option>
+              <option v-for="z in zonas" :key="z.id" :value="z.id">{{ z.name }}</option>
+            </select>
+            <button class="btn" @click="calcRuta">{{ t('ecoCalc') }}</button>
+          </div>
+          <div id="eco-map" style="height:400px;border-radius:12px;overflow:hidden;border:1px solid rgba(0,229,255,0.2)"></div>
+        </div>
 
-                            if (activeLayer.value === 'no2') {
-                                color = seg.no2 > 60 ? '#ff007f' : seg.no2 > 30 ? '#ffff00' : '#39ff14';
-                                val = seg.no2 + ' µg/m³'; label = 'NO₂';
-                            } else if (activeLayer.value === 'noise') {
-                                color = seg.noise > 65 ? '#ff007f' : '#39ff14';
-                                val = seg.noise + ' dB'; label = 'Ruido';
-                            }
+        <div v-if="rutas.length" class="card">
+          <h3 style="margin-bottom:16px;font-size:1.1rem;color:var(--primary)">{{ t('ecoComp') }}</h3>
+          <div v-for="(r,i) in rutas" :key="i" class="route-card" :class="i===1?'y':i===2?'r':''">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+              <strong style="font-size:1.1rem">{{ r.name }}</strong>
+              <span class="badge" :class="i===1?'yellow':i===2?'red':''">● {{ r.label }}</span>
+            </div>
+            <div class="grid-4" style="gap:12px">
+              <div style="text-align:center; background:var(--panel); padding:10px; border-radius:8px;">
+                <div style="font-weight:800; font-size:1.2rem; color:var(--text)">{{ r.distKm }} km</div>
+                <div style="font-size:0.75rem;color:var(--muted);text-transform:uppercase;margin-top:4px;">{{ t('ecoDist') }}</div>
+              </div>
+              <div style="text-align:center; background:var(--panel); padding:10px; border-radius:8px;">
+                <div style="font-weight:800; font-size:1.2rem; color:var(--primary)">{{ getRouteStats(r).timeMin }} min</div>
+                <div style="font-size:0.75rem;color:var(--muted);text-transform:uppercase;margin-top:4px;">{{ t('ecoTime') }} ({{ tMode }})</div>
+              </div>
+              <div style="text-align:center; background:var(--panel); padding:10px; border-radius:8px;">
+                <div style="font-weight:800; font-size:1.2rem;" :style="{color: getRouteStats(r).co2g > 0 ? 'var(--red)' : 'var(--green)'}">{{ getRouteStats(r).co2g }} g</div>
+                <div style="font-size:0.75rem;color:var(--muted);text-transform:uppercase;margin-top:4px;">{{ t('ecoFoot') }}</div>
+              </div>
+              <div style="text-align:center; background:var(--panel); padding:10px; border-radius:8px;">
+                <div style="font-weight:800; font-size:1.2rem; color:var(--text)">{{ r.pollutionIndex }}</div>
+                <div style="font-size:0.75rem;color:var(--muted);text-transform:uppercase;margin-top:4px;">{{ t('ecoIdx') }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div v-if="bestHours.length" class="card">
+          <h3 style="margin-bottom:16px;font-size:1.1rem;color:var(--primary)">{{ t('ecoBest') }}</h3>
+          <div class="chart-box"><canvas id="besthour-chart"></canvas></div>
+        </div>
+      </div>
 
-                            latlngs.push([seg.coordinates[1], seg.coordinates[0]]);
+      <!-- ===== GREENSCORE ===== -->
+      <div v-show="tab==='greenscore'">
+        <div v-if="bestZone" class="card glass-glow" style="background:linear-gradient(135deg,rgba(0,230,118,0.1),rgba(0,229,255,0.1));border-color:var(--green);text-align:center;padding:32px">
+          <div style="font-size:3rem; filter:drop-shadow(0 0 15px rgba(0,230,118,0.6));">🥇</div>
+          <h3 style="color:var(--green);margin:12px 0;text-transform:uppercase;letter-spacing:1px;">{{ t('gsBest') }}</h3>
+          <div style="font-size:2.2rem;font-weight:800;color:white;text-shadow:0 0 20px rgba(0,230,118,0.4);">{{ bestZone.name }}</div>
+          <div style="font-size:1.1rem;color:var(--primary);margin-top:8px;font-weight:600;">GreenScore: {{ bestZone.greenScore }} / 100</div>
+        </div>
 
-                            const circle = L.circleMarker([seg.coordinates[1], seg.coordinates[0]], {
-                                radius: 12, color: color, fillColor: color,
-                                fillOpacity: 0.7, weight: 2
-                            }).addTo(mapInstance.value)
-                            .bindPopup(`<div style="background:#0f141e; color:#fff; padding:5px;"><b>ID:</b> ${seg.segmentId}<br><b>${label}:</b> ${val}<br><b>Peatones:</b> ${seg.pedestrians}</div>`);
-                            
-                            mapLayers.value.push(circle);
-                        });
+        <div class="grid-2">
+          <div class="card">
+            <h3 style="margin-bottom:16px;font-size:1.05rem;color:var(--primary)">{{ t('gsRank') }}</h3>
+            <div v-for="z in gsRanked" :key="z.id" class="zone-row">
+              <div style="display:flex;align-items:center;gap:12px">
+                <span style="font-weight:800;color:var(--muted);width:24px;font-size:1.1rem">{{ z.rank }}</span>
+                <span style="font-weight:500">{{ z.name }}</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:12px">
+                <span style="font-weight:800;font-size:1.1rem">{{ z.greenScore }}</span>
+                <span :class="z.trend==='up'?'tag-green':z.trend==='down'?'tag-red':'tag-yellow'">
+                  {{ z.trend==='up'?'↑':z.trend==='down'?'↓':'→' }}
+                </span>
+                <span style="font-size:0.75rem;color:var(--muted);background:rgba(0,0,0,0.3);padding:4px 8px;border-radius:4px;">ML: {{ z.mlPrediction }}</span>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <h3 style="margin-bottom:16px;font-size:1.05rem;color:var(--primary)">{{ t('gsRadar') }}</h3>
+            <div class="chart-box" style="height:350px;"><canvas id="radar-chart"></canvas></div>
+          </div>
+        </div>
+        <div class="card">
+          <h3 style="margin-bottom:16px;font-size:1.05rem;color:var(--primary)">{{ t('gsMap') }}</h3>
+          <div id="gs-map" style="height:400px;border-radius:12px;overflow:hidden;border:1px solid rgba(0,229,255,0.2)"></div>
+        </div>
+      </div>
 
-                        if (data.is_path && latlngs.length > 1) {
-                            const polyline = L.polyline(latlngs, {
-                                color: '#00f0ff',
-                                weight: 4,
-                                dashArray: '10, 10',
-                                opacity: 0.8
-                            }).addTo(mapInstance.value);
-                            mapLayers.value.push(polyline);
-                            
-                            // Ajustar vista a la ruta
-                            mapInstance.value.fitBounds(polyline.getBounds(), { padding: [50, 50] });
-                        }
+      <!-- ===== PERFIL ===== -->
+      <div v-show="tab==='perfil'">
+        <div class="card glass-glow" style="position:relative; overflow:hidden;">
+          <div style="position:absolute; top:0; left:0; width:100%; height:120px; background:linear-gradient(90deg, rgba(168,85,247,0.2), rgba(0,229,255,0.2)); border-bottom:1px solid rgba(255,255,255,0.05);"></div>
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:32px; position:relative; padding-top:40px;">
+            <div style="display:flex;align-items:flex-end;gap:24px;">
+              <div class="profile-avatar" :class="{'is-zoomed': profileAvatarZoomed}" @mouseenter="profileAvatarZoomed = true" @mouseleave="profileAvatarZoomed = false" @click="triggerAvatarUpload">
+                <img v-if="profileAvatar" :src="profileAvatar" style="width:100%;height:100%;object-fit:cover;border-radius:8px;">
+                <img v-else src="mascot.png" alt="mascot" style="width:100%;height:100%;object-fit:contain;">
+              </div>
+              <div style="padding-bottom:10px;">
+                <h2 style="font-size:2.2rem;margin-bottom:6px;font-weight:800;text-shadow:0 0 15px rgba(255,255,255,0.2)">
+                  <input v-if="isEditingProfile" v-model="profileName" class="edit-input" id="name-input">
+                  <span v-else>{{ profileName }}</span>
+                </h2>
+                <div style="color:var(--primary); font-weight:600; font-size:1rem; letter-spacing:0.5px;">{{ t('profLvl') }}</div>
 
-                        if (data.route.length > 0) {
-                            currentAvgNo2.value = Math.round(totalNo2 / data.route.length);
-                        }
+                <div v-if="isEditingProfile" style="margin-top:10px;">
+                  <button class="btn" style="padding:6px 12px; font-size:0.8rem;" @click="triggerAvatarUpload">{{ t('btnImg') }}</button>
+                  <input type="file" id="avatar-upload" style="display:none" @change="handleAvatarUpload" accept="image/*">
+                </div>
+              </div>
+            </div>
+            <button class="btn" @click="isEditingProfile = !isEditingProfile">
+              {{ isEditingProfile ? t('btnSave') : t('btnEdit') }}
+            </button>
+          </div>
 
-                        updateChart(data.route);
+          <div class="card" style="border-left: 5px solid var(--primary); margin-bottom: 24px; background: rgba(0,229,255,0.1);">
+            <h3 style="font-size:1.1rem;margin-bottom:8px;color:var(--primary)">{{ t('profChallTitle') }}</h3>
+            <p style="font-size:0.95rem; line-height:1.5;">
+              <b>{{ t('profChallD1') }}</b> {{ t('profChallD2') }}<br>
+              <span style="color:var(--green); font-weight:bold">{{ t('profChallP1') }}</span> {{ t('profChallP2') }}
+            </p>
+          </div>
 
-                    } catch (e) {
-                        console.error(e);
-                    }
-                };
+          <div class="grid-2" style="margin-bottom:32px">
+            <div class="kpi"><div class="kpi-val" style="color:#a855f7; text-shadow:0 0 15px rgba(168,85,247,0.4);">1250</div><div class="kpi-lbl">{{ t('profPts') }}</div></div>
+            <div class="kpi"><div class="kpi-val" style="color:var(--green); text-shadow:0 0 15px rgba(0,230,118,0.4);">45.2kg</div><div class="kpi-lbl">{{ t('profCo2') }}</div></div>
+          </div>
 
-                const setLayer = (layer) => {
-                    activeLayer.value = layer;
-                    fetchRoute();
-                };
+          <h3 style="font-size:1.1rem;margin-bottom:16px;color:var(--primary)">{{ t('profAch') }}</h3>
+          <div class="grid-3" style="margin-bottom:32px">
+            <div class="achievement"><div style="font-size:2.5rem;margin-bottom:12px;filter:drop-shadow(0 0 10px rgba(0,230,118,0.5));">🚴‍♂️</div><div style="font-weight:700;font-size:1.05rem;">{{ t('profCyc') }}</div><div style="font-size:0.8rem;color:var(--muted);margin-top:6px;">{{ t('profCycD') }}</div></div>
+            <div class="achievement"><div style="font-size:2.5rem;margin-bottom:12px;filter:drop-shadow(0 0 10px rgba(0,230,118,0.5));">🚶‍♂️</div><div style="font-weight:700;font-size:1.05rem;">{{ t('profWalk') }}</div><div style="font-size:0.8rem;color:var(--muted);margin-top:6px;">{{ t('profWalkD') }}</div></div>
+            <div class="achievement"><div style="font-size:2.5rem;margin-bottom:12px;filter:drop-shadow(0 0 10px rgba(0,230,118,0.5));">🌳</div><div style="font-weight:700;font-size:1.05rem;">{{ t('profPlant') }}</div><div style="font-size:0.8rem;color:var(--muted);margin-top:6px;">{{ t('profPlantD') }}</div></div>
+          </div>
 
-                const toggleZBE = async () => {
-                    zbeActive.value = !zbeActive.value;
-                    if (zbeActive.value) {
-                        notify('ZBE Activada', 'Tráfico redirigido. Acceso restringido a vehículos cero emisiones.');
-                        await fetch('/api/ecozones/centro/activate', { method: 'POST' });
-                        currentAvgNo2.value = Math.max(15, currentAvgNo2.value - 20); // Simulamos bajada en UI
-                    } else {
-                        notify('ZBE Desactivada', 'Tráfico normalizado. ZBE levantada.');
-                        await fetch('/api/ecozones/centro/deactivate', { method: 'POST' });
-                    }
-                    setTimeout(fetchRoute, 1000);
-                };
+          <h3 style="font-size:1.1rem;margin-bottom:16px;color:var(--primary)">{{ t('profImp') }}</h3>
+          <div class="chart-box" style="height:300px;"><canvas id="impact-chart"></canvas></div>
+        </div>
+      </div>
 
-                const updateChart = (routeData) => {
-                    if (!chartInstance) return;
-                    // Simular histórico para el chart basado en el estado actual
-                    const now = currentAvgNo2.value;
-                    chartInstance.data.datasets[0].data = [now-15, now-5, now+10, now+5, now];
-                    chartInstance.update();
-                };
+    </div>
+  </div>
 
-                const initChart = () => {
-                    const ctx = document.getElementById('pulseChart').getContext('2d');
-                    chartInstance = new Chart(ctx, {
-                        type: 'line',
-                        data: {
-                            labels: ['-4h', '-3h', '-2h', '-1h', 'Now'],
-                            datasets: [{
-                                label: 'NO₂ Global',
-                                data: [30, 35, 40, 45, 50],
-                                borderColor: '#00f0ff',
-                                backgroundColor: 'rgba(0,240,255,0.1)',
-                                tension: 0.4, fill: true
-                            }]
-                        },
-                        options: {
-                            responsive: true, maintainAspectRatio: false,
-                            plugins: { legend: { display: false } },
-                            scales: {
-                                x: { display: false },
-                                y: { ticks: { color: '#94a3b8', font: {size: 10} }, grid: { color: 'rgba(255,255,255,0.05)' } }
-                            }
-                        }
-                    });
-                };
+  <!-- Chat Widget -->
+  <div class="chat-widget glass">
+    <div class="chat-head" @click="chatOpen=!chatOpen">
+      <span style="display:flex; align-items:center; gap:8px;">
+        <img src="mascot.png" class="chat-mascot" alt="URBS">
+        {{ t('chatTitle') }}
+      </span>
+      <span style="font-size:0.8rem; opacity:0.8;">{{ chatOpen?'▼':'▲' }}</span>
+    </div>
+    <div v-show="chatOpen">
+      <div class="chat-msgs" id="chat-msgs">
+        <div v-for="m in chatMsgs" :key="m.id" :class="['chat-row', m.u ? 'row-user' : 'row-assistant']">
+          <img v-if="!m.u" src="mascot.png" class="chat-avatar" alt="URBS">
+          <div class="msg" :class="m.u ? 'msg-u' : 'msg-b'">{{ m.text }}</div>
+        </div>
+      </div>
+      <div class="chat-inp">
+        <input v-model="chatIn" @keyup.enter="sendChat" :placeholder="t('chatPl')"/>
+        <button @click="sendChat">➜</button>
+      </div>
+    </div>
+  </div>
 
-                const init3D = () => {
-                    const scene = new THREE.Scene();
-                    const camera = new THREE.PerspectiveCamera(60, 350/250, 0.1, 1000);
-                    const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
-                    renderer.setSize(350, 250);
-                    document.getElementById('canvas3d').appendChild(renderer.domElement);
+</div>
 
-                    const group = new THREE.Group();
-                    scene.add(group);
-                    
-                    const geom = new THREE.BufferGeometry();
-                    const vertices = []; const colors = [];
-                    const c1 = new THREE.Color(0xff007f); const c2 = new THREE.Color(0x00f0ff);
 
-                    for ( let i = 0; i < 2000; i ++ ) {
-                        const x = (Math.random() - 0.5) * 6;
-                        const y = (Math.random() - 0.5) * 3;
-                        const z = (Math.random() - 0.5) * 6;
-                        vertices.push( x, y, z );
-                        const c = c1.clone().lerp(c2, (y+1.5)/3);
-                        colors.push(c.r, c.g, c.b);
-                    }
-                    geom.setAttribute( 'position', new THREE.Float32BufferAttribute( vertices, 3 ) );
-                    geom.setAttribute( 'color', new THREE.Float32BufferAttribute( colors, 3 ) );
-                    
-                    const mat = new THREE.PointsMaterial( { size: 0.05, vertexColors: true, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending } );
-                    const cloud = new THREE.Points( geom, mat );
-                    group.add(cloud);
-                    
-                    camera.position.z = 4.5;
-                    camera.position.y = 1;
-                    camera.lookAt(0,0,0);
 
-                    const animate = () => {
-                        requestAnimationFrame(animate);
-                        group.rotation.y += 0.002;
-                        if(zbeActive.value) {
-                            mat.opacity = Math.max(0.2, mat.opacity - 0.01); // Se disipa la nube
-                        } else {
-                            mat.opacity = Math.min(0.8, mat.opacity + 0.01);
-                        }
-                        renderer.render(scene, camera);
-                    };
-                    animate();
-                };
+<script>
+function startUrbanPulseApp(){
+if (typeof Vue === 'undefined') {
+  console.error('Vue not found, loading fallback...');
+  const s = document.createElement('script');
+  s.src = 'https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js';
+  s.crossOrigin = 'anonymous';
+  s.onload = () => startUrbanPulseApp();
+  s.onerror = () => { console.error('Failed to load Vue fallback.'); };
+  document.head.appendChild(s);
+  return;
+}
+const {createApp,ref,onMounted,watch}=Vue;
+const API = window.location.origin;
+createApp({setup(){
+const savedLang = localStorage.getItem('urbs-lang');
+const savedTheme = localStorage.getItem('urbs-theme');
+const prefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+const initialLang = savedLang === 'en' ? 'en' : 'es';
+const initialTheme = savedTheme ? savedTheme === 'light' : false;
+const greetingText = (code) => code === 'en' ? 'Hello! I am URBS. I monitor the city for you.' : '¡Hola! Soy URBS. Monitorizo la ciudad para ti.';
+const offlineText = (code) => code === 'en' ? 'I cannot connect to the URBS server right now. I am replying with local data.' : 'No puedo conectar con el servidor URBS ahora mismo. Te respondo con datos locales.';
 
-                const fetchLLM = async () => {
-                    try {
-                        const res = await fetch('/api/explain/Coruna-Segment-1');
-                        const data = await res.json();
-                        llmExplanation.value = "";
-                        let i = 0;
-                        const text = data.explanation;
-                        const typeWriter = () => {
-                            if (i < text.length) {
-                                llmExplanation.value += text.charAt(i);
-                                i++;
-                                setTimeout(typeWriter, 20);
-                            }
-                        };
-                        typeWriter();
-                    } catch (e) {
-                        llmExplanation.value = "Error al contactar con el modelo de predicción local.";
-                    }
-                };
+const tab=ref('dashboard'),zonas=ref([]),dash=ref({avgAqi:0,avgTraffic:0,alertCount:0,avgGreenScore:0,alerts:[]}),
+gsRanked=ref([]),bestZone=ref(null),rutas=ref([]),bestHours=ref([]),ecoOrigen=ref(''),ecoDest=ref(''),
+chatOpen=ref(true),chatIn=ref(''),chatMsgs=ref([{id:0,text:greetingText(initialLang),u:false}]),
+indicators=ref([{label:'NO₂',value:'--',color:'#00e5ff'},{label:'CO₂',value:'--',color:'#a78bfa'},{label:'PM10',value:'--',color:'#fb923c'},{label:'PM2.5',value:'--',color:'#f43f5e'},{label:'Ruido dB',value:'--',color:'#facc15'}]);
 
-                onMounted(() => {
-                    if (Notification.permission !== 'denied') Notification.requestPermission();
-                    initMap();
-                    initChart();
-                    init3D();
-                    setTimeout(() => {
-                        fetchRoute();
-                        fetchLLM();
-                    }, 1000);
-                    
-                    setInterval(fetchRoute, 15000);
-                });
+const tMode=ref('walk');
+const viewMode=ref('ciudadano');
+const lang=ref(initialLang);
+const isLight=ref(initialTheme);
+const profileName=ref('Eco-Ciudadano');
+const editingName=ref(false);
+const isEditingProfile=ref(false);
+const profileAvatar=ref('');
+const profileAvatarZoomed=ref(false);
 
-                return {
-                    activeLayer, setLayer, fetchRoute, zbeActive, toggleZBE,
-                    currentAvgNo2, llmExplanation, notifications,
-                    selectedOrigin, selectedDestination, availableSegments
-                };
-            }
-        }).mount('#app');
-    </script>
+const dict = {
+  es: {
+    subtitle: 'Monitorización Ambiental', navDash: 'Dashboard', navAir: 'AirWatch', navEco: 'EcoRuta', navGreen: 'GreenScore', navProfile: 'Mi Perfil',
+    dashTitle: 'Dashboard Principal', airTitle: 'AirWatch — Vista Inmersiva', ecoTitle: 'EcoRuta Inteligente', gsTitle: 'GreenScore Urbano', profTitle: 'Mi Perfil',
+    sysActive: 'Sistema Activo', modeC: '🚶 Ciudadano', modeA: '🏛️ Alcalde',
+    welcome: '🌟 Bienvenido a UrbanPulse',
+    welcomeSub: 'La plataforma inteligente de A Coruña que integra datos IoT de tráfico, calidad del aire y ruido ambiental en tiempo real. Nuestro objetivo es ayudarte a tomar decisiones de movilidad más sostenibles, saludables y eficientes.',
+    howTo: '¿Cómo usar UrbanPulse?',
+    descAir: 'Explora la nube de contaminación de la ciudad en 3D interactivo y mapas de calor.',
+    descEco: 'Encuentra el camino menos contaminado hacia tu destino comparando medios de transporte.',
+    descGS: 'Descubre qué barrios son los más saludables hoy con nuestro algoritmo de IA.',
+    kpiAqi: 'AQI Medio Ciudad', kpiTraffic: 'Tráfico Medio (veh/h)', kpiAlerts: 'Alertas Activas', kpiGS: 'GreenScore Medio',
+    mapRt: '📍 Mapa de Estado en Tiempo Real', alertsAc: '🔔 Alertas Activas (Zonas Críticas)',
+    noAlerts: '✨ Calidad del aire óptima. Sin alertas activas.', syncTitle: '🕐 Sincronización de Sensores',
+    arqTitle: '📐 Arquitectura de Datos: Entidades FIWARE',
+    indTitle: '🗺️ Mapa de Calor Interactivo', corrTitle: '📈 Correlación Tráfico ↔ NO₂',
+    volTitle: '🌆 Vista Volumétrica 3D Inmersiva', volDesc: 'Click y arrastra para rotar la vista. Scroll para hacer zoom.',
+    predTitle: '⏱️ Predicción de Calidad del Aire (Próximas 6h)',
+    ecoPlan: 'Planificador de Rutas Sostenibles', ecoCar: '🚗 Coche', ecoBus: '🚌 Bus', ecoBike: '🚲 Bici', ecoWalk: '🚶 A pie',
+    ecoOrig: 'Selecciona Origen...', ecoDest: 'Selecciona Destino...', ecoCalc: '🔍 Calcular Rutas',
+    ecoComp: '📊 Comparativa de Rutas Alternativas', ecoDist: 'Distancia', ecoTime: 'Tiempo', ecoFoot: 'Huella CO₂', ecoIdx: 'Índice Polución',
+    ecoBest: '⏰ Mejor Hora para Salir (Previsión AQI)',
+    gsBest: 'Barrio Más Saludable Hoy', gsRank: '📋 Ranking Completo de la Ciudad', gsRadar: '📡 Radar Comparativo (Top 3)', gsMap: '🗺️ Mapa Coroplético de Salubridad',
+    profLvl: '⭐ Nivel 4 — Guardián del Aire', profPts: 'Puntos Verdes', profCo2: 'CO₂ Ahorrado', profAch: '🏅 Logros Obtenidos',
+    profCyc: 'Ciclista Urbano', profCycD: '+100 km sin emisiones', profWalk: 'Caminante Blanco', profWalkD: '50 rutas a pie completadas',
+    profPlant: 'Plantador Local', profPlantD: 'Nivel de contribución oro', profImp: '📈 Tu Impacto Semanal',
+    profChallTitle: '🎯 Reto Semanal Ciudadano', profChallD1: 'Esta semana:', profChallD2: 'llega al trabajo sin coche 3 días.', profChallP1: 'Premio:', profChallP2: '+200 puntos y el barrio te lo agradece (literalmente, en el mapa).',
+    btnEdit: 'Editar Perfil', btnSave: 'Guardar', btnImg: 'Cambiar Imagen',
+    chatTitle: 'Asistente URBS', chatPl: 'Pregunta a URBS...', chatWelcome: '¡Hola! Soy URBS. Monitorizo la ciudad para ti.', chatOffline: 'No puedo conectar con el servidor URBS ahora mismo. Te respondo con datos locales.',
+    lightBtn: '☀️ Modo Claro', darkBtn: '🌙 Modo Oscuro',
+    alertsAc: '🔔 Alertas Activas (Zonas Críticas)',
+    fiwareNote: 'Relaciones directas: refTrafficFlowObserved y refDeviceModel',
+    fiwareTrafficMeta: 'Flujo vehicular observado en tiempo real sobre el tramo urbano.',
+    fiwareImpactMeta: 'Relaciona el tráfico con el impacto ambiental medido en el mismo punto.',
+    fiwareAirMeta: 'Lectura atmosférica consolidada para la monitorización urbana.',
+    fiwareForecastMeta: 'Proyección a corto plazo del impacto ambiental en función del tráfico actual.',
+    fiwareNoiseMeta: 'Captura el nivel de ruido ambiental de forma independiente.',
+    fiwareDeviceMeta: 'Entidad genérica del sensor o dispositivo que alimenta la plataforma.',
+    fiwareModelMeta: 'Define el modelo físico y sus atributos de fabricación.',
+    fiwareBase: 'base', fiwareImpact: 'impacto', fiwareQuality: 'calidad', fiwareForecast: 'forecast', fiwareNoise: 'ruido', fiwareOrigin: 'origen', fiwareCatalog: 'catálogo',
+    bestHourLabel: 'AQI por hora', bestHourHint: 'Mejor hora: ', predAqi: 'AQI Predicho'
+  },
+  en: {
+    subtitle: 'Environmental Monitoring', navDash: 'Dashboard', navAir: 'AirWatch', navEco: 'EcoRuta', navGreen: 'GreenScore', navProfile: 'My Profile',
+    dashTitle: 'Main Dashboard', airTitle: 'AirWatch — Immersive View', ecoTitle: 'Smart EcoRuta', gsTitle: 'Urban GreenScore', profTitle: 'My Profile',
+    sysActive: 'System Active', modeC: '🚶 Citizen', modeA: '🏛️ Mayor',
+    welcome: '🌟 Welcome to UrbanPulse',
+    welcomeSub: 'The smart platform of A Coruña that integrates IoT data of traffic, air quality, and environmental noise in real time. Our goal is to help you make more sustainable, healthy, and efficient mobility decisions.',
+    howTo: 'How to use UrbanPulse?',
+    descAir: 'Explore the city\'s pollution cloud in interactive 3D and heatmaps.',
+    descEco: 'Find the least polluted path to your destination comparing transport modes.',
+    descGS: 'Discover which neighborhoods are healthiest today with our AI algorithm.',
+    kpiAqi: 'Avg City AQI', kpiTraffic: 'Avg Traffic (veh/h)', kpiAlerts: 'Active Alerts', kpiGS: 'Avg GreenScore',
+    mapRt: '📍 Real-Time Status Map', alertsAc: '🔔 Active Alerts (Critical Zones)',
+    noAlerts: '✨ Optimal air quality. No active alerts.', syncTitle: '🕐 Sensor Synchronization',
+    arqTitle: '📐 Data Architecture: FIWARE Entities',
+    indTitle: '🗺️ Interactive Heatmap', corrTitle: '📈 Traffic ↔ NO₂ Correlation',
+    volTitle: '🌆 Immersive 3D Volumetric View', volDesc: 'Click and drag to rotate the view. Scroll to zoom.',
+    predTitle: '⏱️ Air Quality Prediction (Next 6h)',
+    ecoPlan: 'Sustainable Route Planner', ecoCar: '🚗 Car', ecoBus: '🚌 Bus', ecoBike: '🚲 Bike', ecoWalk: '🚶 Walk',
+    ecoOrig: 'Select Origin...', ecoDest: 'Select Destination...', ecoCalc: '🔍 Calculate Routes',
+    ecoComp: '📊 Alternative Routes Comparison', ecoDist: 'Distance', ecoTime: 'Time', ecoFoot: 'CO₂ Footprint', ecoIdx: 'Pollution Index',
+    ecoBest: '⏰ Best Time to Leave (AQI Forecast)',
+    gsBest: 'Healthiest Neighborhood Today', gsRank: '📋 Full City Ranking', gsRadar: '📡 Comparative Radar (Top 3)', gsMap: '🗺️ Choropleth Health Map',
+    profLvl: '⭐ Level 4 — Air Guardian', profPts: 'Green Points', profCo2: 'CO₂ Saved', profAch: '🏅 Achievements Unlocked',
+    profCyc: 'Urban Cyclist', profCycD: '+100 km emission-free', profWalk: 'White Walker', profWalkD: '50 walking routes completed',
+    profPlant: 'Local Planter', profPlantD: 'Gold contribution level', profImp: '📈 Your Weekly Impact',
+    profChallTitle: '🎯 Weekly Citizen Challenge', profChallD1: 'This week:', profChallD2: 'get to work without a car 3 days.', profChallP1: 'Prize:', profChallP2: '+200 points and the neighborhood thanks you (literally, on the map).',
+    btnEdit: 'Edit Profile', btnSave: 'Save', btnImg: 'Change Image',
+    chatTitle: 'URBS Assistant', chatPl: 'Ask URBS...', chatWelcome: 'Hello! I am URBS. I monitor the city for you.', chatOffline: 'I cannot connect to the URBS server right now. I am replying with local data.',
+    lightBtn: '☀️ Light Mode', darkBtn: '🌙 Dark Mode',
+    alertsAc: '🔔 Active Alerts (Critical Zones)',
+    fiwareNote: 'Direct relationships: refTrafficFlowObserved and refDeviceModel',
+    fiwareTrafficMeta: 'Real-time vehicle flow observed on the urban road segment.',
+    fiwareImpactMeta: 'Links traffic to the environmental impact measured at the same point.',
+    fiwareAirMeta: 'Consolidated atmospheric reading for urban monitoring.',
+    fiwareForecastMeta: 'Short-term projection of environmental impact based on current traffic.',
+    fiwareNoiseMeta: 'Captures ambient noise level independently.',
+    fiwareDeviceMeta: 'Generic sensor or device entity feeding the platform.',
+    fiwareModelMeta: 'Defines the physical model and its manufacturing attributes.',
+    fiwareBase: 'base', fiwareImpact: 'impact', fiwareQuality: 'quality', fiwareForecast: 'forecast', fiwareNoise: 'noise', fiwareOrigin: 'origin', fiwareCatalog: 'catalog',
+    bestHourLabel: 'Hourly AQI', bestHourHint: 'Best hour: ', predAqi: 'Predicted AQI'
+  }
+};
+const weeklyChallengeBank = {
+  es: [
+    { title: '🎯 Reto Semanal Ciudadano', intro: 'Esta semana:', task: 'llega al trabajo sin coche 3 días.', prize: 'Premio:', reward: '+200 puntos y el barrio te lo agradece (literalmente, en el mapa).' },
+    { title: '🎯 Reto Semanal Ciudadano', intro: 'Esta semana:', task: 'haz 2 trayectos a pie en lugar de usar el coche.', prize: 'Premio:', reward: '+180 puntos y una ruta más limpia en tu zona.' },
+    { title: '🎯 Reto Semanal Ciudadano', intro: 'Esta semana:', task: 'elige la bici al menos 3 veces para trayectos cortos.', prize: 'Premio:', reward: '+220 puntos y bonus de barrio saludable.' },
+    { title: '🎯 Reto Semanal Ciudadano', intro: 'Esta semana:', task: 'combina bus y caminata en tu desplazamiento diario.', prize: 'Premio:', reward: '+160 puntos y menos presión en las calles más cargadas.' },
+    { title: '🎯 Reto Semanal Ciudadano', intro: 'Esta semana:', task: 'evita Cuatro Caminos en hora punta al menos 2 días.', prize: 'Premio:', reward: '+140 puntos y menos tiempo atrapado en atascos.' },
+    { title: '🎯 Reto Semanal Ciudadano', intro: 'Esta semana:', task: 'comparte trayecto o agrupa recados en un solo viaje.', prize: 'Premio:', reward: '+170 puntos y una ciudad un poco más fluida.' }
+  ],
+  en: [
+    { title: '🎯 Weekly Citizen Challenge', intro: 'This week:', task: 'get to work without a car 3 days.', prize: 'Prize:', reward: '+200 points and the neighborhood thanks you (literally, on the map).' },
+    { title: '🎯 Weekly Citizen Challenge', intro: 'This week:', task: 'walk for 2 daily trips instead of driving.', prize: 'Prize:', reward: '+180 points and a cleaner route in your area.' },
+    { title: '🎯 Weekly Citizen Challenge', intro: 'This week:', task: 'choose the bike at least 3 times for short trips.', prize: 'Prize:', reward: '+220 points and a healthier neighborhood bonus.' },
+    { title: '🎯 Weekly Citizen Challenge', intro: 'This week:', task: 'combine bus and walking for your daily commute.', prize: 'Prize:', reward: '+160 points and less pressure on the busiest streets.' },
+    { title: '🎯 Weekly Citizen Challenge', intro: 'This week:', task: 'avoid Cuatro Caminos during rush hour for 2 days.', prize: 'Prize:', reward: '+140 points and less time stuck in traffic.' },
+    { title: '🎯 Weekly Citizen Challenge', intro: 'This week:', task: 'carpool or bundle errands into a single trip.', prize: 'Prize:', reward: '+170 points and a slightly smoother city.' }
+  ]
+};
+const challengeKeyMap = { profChallTitle: 'title', profChallD1: 'intro', profChallD2: 'task', profChallP1: 'prize', profChallP2: 'reward' };
+const weekNumber = (date = new Date()) => {
+  const utcDate = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNumber = (utcDate.getUTCDay() + 6) % 7;
+  utcDate.setUTCDate(utcDate.getUTCDate() - dayNumber + 3);
+  const firstThursday = new Date(Date.UTC(utcDate.getUTCFullYear(), 0, 4));
+  return 1 + Math.round((utcDate - firstThursday) / 604800000);
+};
+const getWeeklyChallenge = (locale = lang.value) => {
+  const bank = weeklyChallengeBank[locale] || weeklyChallengeBank.es;
+  return bank[(weekNumber() - 1) % bank.length];
+};
+const t = (k) => {
+  if (challengeKeyMap[k]) return getWeeklyChallenge(lang.value)[challengeKeyMap[k]];
+  return dict[lang.value][k] || k;
+};
+
+// Hero phrases (small dynamic lines under title)
+const heroPhrases = {
+  es: [
+    'Descubre hoy las zonas más limpias de la ciudad.',
+    'Pequeños cambios, grandes mejoras en tu barrio.',
+    '¿Sabías? Caminar 20 minutos reduce tu huella y mejora tu salud.',
+    'Elige rutas más verdes: tu barrio lo notará.',
+    'Comparte coche y reduce el tráfico en horas punta.'
+  ],
+  en: [
+    'Discover today the cleanest areas in the city.',
+    'Small changes, big improvements in your neighborhood.',
+    'Did you know? A 20-minute walk reduces your footprint and boosts health.',
+    'Choose greener routes: your neighborhood will feel it.',
+    'Carpool to ease rush-hour traffic.'
+  ]
+};
+const heroPhrase = ref('');
+const mascotAnimate = ref(false);
+const getHeroPhrase = (locale = lang.value, date = new Date()) => {
+  const bank = heroPhrases[locale] || heroPhrases.es;
+  const idx = (date.getFullYear() + date.getMonth() + date.getDate()) % bank.length;
+  return bank[idx];
+};
+
+watch(lang, (v) => {
+  heroPhrase.value = getHeroPhrase(v);
+});
+
+watch(tab, (val) => {
+  if (val === 'dashboard') {
+    // trigger mascot entry animation
+    mascotAnimate.value = false;
+    setTimeout(() => { mascotAnimate.value = true; }, 80);
+  }
+});
+
+const editName = () => { editingName.value = true; setTimeout(() => document.getElementById('name-input')?.focus(), 100); };
+const triggerAvatarUpload = () => document.getElementById('avatar-upload').click();
+const handleAvatarUpload = (e) => {
+  const f = e.target.files[0];
+  if (f) profileAvatar.value = URL.createObjectURL(f);
+};
+
+watch(isLight, (val) => {
+  document.body.classList.toggle('light-mode', val);
+  localStorage.setItem('urbs-theme', val ? 'light' : 'dark');
+  [dashMap, awMap, ecoMap, gsMap].forEach((map) => {
+    if (!map) return;
+    map.eachLayer((layer) => {
+      if (layer instanceof L.TileLayer) {
+        layer.setUrl(mapTileUrl());
+      }
+    });
+    map.invalidateSize();
+  });
+});
+
+watch(viewMode, (nm) => {
+  const t_alcalde = lang.value === 'en' ? '🏛️ Mayor Mode activated. What macro metrics do you want to evaluate?' : '🏛️ Has activado el Modo Alcalde. ¿Qué métricas macro quieres evaluar?';
+  const t_ciudadano = lang.value === 'en' ? '🚶 Citizen Mode active. Ask me how to avoid traffic!' : '🚶 Has vuelto al Modo Ciudadano. ¡Pregúntame cómo evitar los atascos!';
+  chatMsgs.value.push({id:chatId++, text: nm === 'alcalde' ? t_alcalde : t_ciudadano, u:false});
+  setTimeout(()=>{const el=document.getElementById('chat-msgs');if(el)el.scrollTop=el.scrollHeight;},100);
+  updateDashMap(); // Re-render map tooltips
+});
+
+
+let chatId=1,dashMap=null,awMap=null,ecoMap=null,gsMap=null,ecoLayers=[],gsLayers=[],scatterChart=null,forecastChart=null,besthourChart=null,radarChart=null,impactChart=null,renderer3d=null,scene3d=null,camera3d=null,isDragging=false,lastMouse={x:0,y:0},rotY=0,rotX=0.3;
+
+const formatTs=ts=>{if(!ts)return'N/A';const d=new Date(ts);return d.toLocaleTimeString(lang.value === 'en' ? 'en-US' : 'es-ES',{hour:'2-digit',minute:'2-digit',second:'2-digit'});};
+
+const fetchZones=async()=>{
+try{const r=await fetch(`${API}/api/zones`);zonas.value=await r.json();}
+catch(e){zonas.value=syntheticZones();}
+normalizeZones();
+populateZoneSelect();
+};
+
+const fetchDash=async()=>{
+try{const r=await fetch(`${API}/api/dashboard`);const d=await r.json();dash.value=d;if(d.zones)zonas.value=d.zones;}
+catch(e){const z=syntheticZones();zonas.value=z;dash.value={avgAqi:Math.round(z.reduce((s,x)=>s+x.aqi,0)/z.length),avgTraffic:Math.round(z.reduce((s,x)=>s+x.traffic,0)/z.length),alertCount:z.filter(x=>x.no2>55).length,avgGreenScore:Math.round(z.reduce((s,x)=>s+x.greenScore,0)/z.length),alerts:z.filter(x=>x.no2>55).map(x=>({zone:x.name,no2:x.no2,noise:x.noise}))};}
+normalizeZones();
+populateZoneSelect();
+updateDashMap();updateIndicators();
+};
+
+const populateZoneSelect = () => {
+  const sel = document.getElementById('zoneSelect');
+  if(!sel) return;
+  // keep existing selection
+  const cur = sel.value || 'global';
+  // remove existing dynamic options
+  Array.from(sel.querySelectorAll('option')).forEach(o=>{ if(o.value!=='global') o.remove(); });
+  (zonas.value || []).forEach(z=>{
+    const opt = document.createElement('option'); opt.value = z.id; opt.text = z.name;
+    sel.appendChild(opt);
+  });
+  sel.value = cur;
+  sel.onchange = async () => { await loadAirwatchForZone(sel.value); };
+  populateForecastZoneSelect();
+};
+
+const populateForecastZoneSelect = () => {
+  const sel = document.getElementById('forecastZoneSelect');
+  if(!sel) return;
+  const cur = sel.value || 'all';
+  Array.from(sel.querySelectorAll('option')).forEach(o=>{ if(o.value!=='all') o.remove(); });
+  (zonas.value || []).forEach(z=>{
+    const opt = document.createElement('option');
+    opt.value = z.id;
+    opt.text = z.name;
+    sel.appendChild(opt);
+  });
+  sel.value = (Array.from(sel.options).some(o => o.value === cur) ? cur : 'all');
+  sel.onchange = () => { initForecastChart(); };
+};
+
+const normalizeZones = () => {
+  const zn = zonas.value || [];
+  for(let i=0;i<zn.length;i++){
+    const z = zn[i];
+    let lat = Number(z.lat);
+    let lon = Number(z.lon);
+    if(isNaN(lat) || isNaN(lon)) continue;
+    const latOk = lat >= 40 && lat <= 46;
+    const lonOk = lon >= -25 && lon <= 5;
+    if(!latOk && lonOk){ const t = lat; z.lat = lon; z.lon = t; }
+    else if(!latOk && !lonOk){ const t = lat; if(t >= -25 && t <= 5 && lon >= 40 && lon <= 46){ z.lat = lon; z.lon = t; } }
+  }
+  zonas.value = zn;
+};
+
+const loadAirwatchForZone = async (zoneId) => {
+  try{
+    const url = zoneId && zoneId !== 'global' ? `${API}/api/airwatch?zone=${zoneId}` : `${API}/api/airwatch`;
+    const r = await fetch(url); const d = await r.json();
+    if(d.zones) zonas.value = d.zones;
+    // refresh UI elements
+    populateForecastZoneSelect();
+    updateDashMap(); updateIndicators(); initForecastChart();
+  }catch(e){console.warn('loadAirwatchForZone failed', e);}
+};
+
+const fetchGS=async()=>{
+try{const r=await fetch(`${API}/api/greenscore`);const d=await r.json();gsRanked.value=d.ranked||[];bestZone.value=d.bestZone||null;}
+catch(e){const z=syntheticZones();const ranked=[...z].sort((a,b)=>b.greenScore-a.greenScore).map((x,i)=>({...x,rank:i+1,trend:['up','down','stable'][Math.floor(Math.random()*3)],mlPrediction:Math.round(x.greenScore*0.98)}));gsRanked.value=ranked;bestZone.value=ranked[0]||null;}
+updateGSMap();updateRadarChart();
+};
+
+const calcRuta=async()=>{
+if(!ecoOrigen.value||!ecoDest.value)return;
+try{const r=await fetch(`${API}/api/ecoruta?origin=${ecoOrigen.value}&destination=${ecoDest.value}&mode=${encodeURIComponent(tMode.value)}`);const d=await r.json();rutas.value=d.routes||[];bestHours.value=d.bestHours||[];if(d.zones&&d.zones.length)zonas.value=d.zones;}
+catch(e){rutas.value=[];bestHours.value=[];}
+drawEcoRoutes();updateBestHourChart();
+};
+
+const getRouteStats = (r) => {
+  const dist = Number(r.distKm || 0);
+  const speed = Number(r.speedKmh || (tMode.value === 'car' ? 30 : tMode.value === 'bus' ? 20 : tMode.value === 'bike' ? 15 : 5));
+  const co2Rate = Number(r.co2Rate || (tMode.value === 'car' ? 140 : tMode.value === 'bus' ? 68 : 0));
+  return {
+    timeMin: Number.isFinite(Number(r.timeMin)) ? Number(r.timeMin) : Math.max(1, Math.round((dist / speed) * 60)),
+    co2g: Number.isFinite(Number(r.co2g)) ? Number(r.co2g) : Math.round(dist * co2Rate)
+  };
+};
+
+// Synthetic fallback
+const syntheticZones=()=>[
+{id:'centro',name:'Centro/María Pita',lat:43.3713,lon:-8.3961,no2:58,pm25:22,pm10:38,co2:210,noise:72,traffic:800,aqi:168,greenScore:35,timestamp:new Date().toISOString()},
+{id:'ensanche',name:'Ensanche',lat:43.368,lon:-8.405,no2:52,pm25:18,pm10:32,co2:188,noise:68,traffic:650,aqi:150,greenScore:42,timestamp:new Date().toISOString()},
+{id:'orzan',name:'Orzán',lat:43.3745,lon:-8.4083,no2:35,pm25:12,pm10:22,co2:128,noise:58,traffic:320,aqi:101,greenScore:62,timestamp:new Date().toISOString()},
+{id:'riazor',name:'Riazor',lat:43.3701,lon:-8.4201,no2:38,pm25:13,pm10:24,co2:138,noise:62,traffic:410,aqi:110,greenScore:58,timestamp:new Date().toISOString()},
+{id:'monteAlto',name:'Monte Alto',lat:43.3778,lon:-8.4147,no2:28,pm25:9,pm10:16,co2:102,noise:51,traffic:210,aqi:81,greenScore:74,timestamp:new Date().toISOString()},
+{id:'ciudadVieja',name:'Ciudad Vieja',lat:43.373,lon:-8.3928,no2:32,pm25:11,pm10:20,co2:118,noise:55,traffic:290,aqi:92,greenScore:66,timestamp:new Date().toISOString()},
+{id:'osCastros',name:'Os Castros',lat:43.358,lon:-8.405,no2:41,pm25:14,pm10:26,co2:150,noise:60,traffic:380,aqi:118,greenScore:52,timestamp:new Date().toISOString()},
+{id:'labanhou',name:'Labañou',lat:43.3622,lon:-8.4183,no2:36,pm25:12,pm10:22,co2:132,noise:57,traffic:290,aqi:104,greenScore:60,timestamp:new Date().toISOString()},
+{id:'juanFlorez',name:'Juan Flórez',lat:43.366,lon:-8.412,no2:49,pm25:17,pm10:30,co2:178,noise:66,traffic:560,aqi:142,greenScore:46,timestamp:new Date().toISOString()},
+{id:'agraOrzan',name:'Agra do Orzán',lat:43.375,lon:-8.422,no2:33,pm25:11,pm10:20,co2:122,noise:54,traffic:270,aqi:96,greenScore:63,timestamp:new Date().toISOString()},
+{id:'cuatroCaminos',name:'Cuatro Caminos',lat:43.3608,lon:-8.4089,no2:68,pm25:26,pm10:46,co2:245,noise:75,traffic:920,aqi:196,greenScore:22,timestamp:new Date().toISOString()},
+{id:'elvina',name:'Elviña',lat:43.3344,lon:-8.4094,no2:30,pm25:10,pm10:18,co2:110,noise:52,traffic:340,aqi:87,greenScore:70,timestamp:new Date().toISOString()},
+{id:'mesoiro',name:'Mesoiro',lat:43.3289,lon:-8.4247,no2:24,pm25:8,pm10:14,co2:88,noise:47,traffic:180,aqi:69,greenScore:80,timestamp:new Date().toISOString()},
+{id:'asXubias',name:'As Xubias',lat:43.3531,lon:-8.3842,no2:62,pm25:28,pm10:50,co2:225,noise:70,traffic:490,aqi:179,greenScore:28,timestamp:new Date().toISOString()},
+{id:'matogrande',name:'Matogrande',lat:43.3469,lon:-8.4283,no2:26,pm25:9,pm10:16,co2:96,noise:49,traffic:220,aqi:75,greenScore:77,timestamp:new Date().toISOString()},
+];
+
+const zoneColor=gs=>gs>65?'#00e676':gs>40?'#ffea00':'#ff1744';
+const aqiColor=aqi=>aqi<100?'#00e676':aqi<150?'#ffea00':'#ff1744';
+
+// DASHBOARD MAP
+const mapTileUrl=()=>isLight.value?'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png':'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+
+const initDashMap=()=>{
+if(!document.getElementById('dash-map'))return;
+dashMap=L.map('dash-map').setView([43.362,-8.41],12);
+L.tileLayer(mapTileUrl()).addTo(dashMap);
+};
+const updateDashMap=()=>{
+if(!dashMap||!zonas.value.length)return;
+dashMap.eachLayer(l=>{if(l instanceof L.CircleMarker)dashMap.removeLayer(l)});
+const z=zonas.value;
+z.forEach(zone=>{
+const col=aqiColor(zone.aqi);
+const marker=L.circleMarker([zone.lat,zone.lon],{radius:10,color:col,fillColor:col,fillOpacity:0.8,weight:2,className:'pulse-marker'})
+.addTo(dashMap);
+marker.bindPopup(`<div style="background:#161d2e;color:#fff;padding:12px;border-radius:8px;min-width:160px;font-family:Inter"><b>${zone.name}</b><br><br>NO₂: <span style="color:#00e5ff">${zone.no2} µg/m³</span><br>AQI: <span style="color:#00e5ff">${zone.aqi}</span><br>GreenScore: <span style="color:#00e676">${zone.greenScore}</span></div>`);
+
+      let tooltipMsg = "";
+      if (viewMode.value === 'alcalde') {
+        tooltipMsg = zone.aqi > 120
+          ? (lang.value === 'en' ? `🚨 Intervention required (AQI ${zone.aqi}). Evaluate ZBE.` : `🚨 Intervención requerida (AQI ${zone.aqi}). Evaluar ZBE.`)
+          : zone.aqi > 90
+            ? (lang.value === 'en' ? `⚠️ Zone under observation (AQI ${zone.aqi}).` : `⚠️ Zona en observación (AQI ${zone.aqi}).`)
+            : (lang.value === 'en' ? `✅ Optimized zone. High social ROI.` : `✅ Zona optimizada. ROI social alto.`);
+      } else {
+        tooltipMsg = zone.aqi > 120
+          ? (lang.value === 'en' ? `😷 Oof! The air is terrible here, stay away.` : `😷 ¡Uf! El aire está fatal por aquí, ni te acerques.`)
+          : zone.aqi > 90
+            ? (lang.value === 'en' ? `🤔 So-so... better go by bike slowly.` : `🤔 Regular... mejor ir en bici con calma.`)
+            : (lang.value === 'en' ? `🤩 Great for a walk!` : `🤩 ¡Genial para ir a dar un paseo!`);
+      }
+
+      const sayStr = lang.value === 'en' ? 'says' : 'dice';
+      marker.bindTooltip(`🤖 URBS ${sayStr}:<br/>${tooltipMsg}`, {className: 'urbs-tooltip', direction: 'top'});
+
+});
+};
+
+// AIRWATCH MAP (heatmap-style)
+const initAWMap=()=>{
+if(!document.getElementById('aw-map'))return;
+awMap=L.map('aw-map').setView([43.362,-8.41],12);
+L.tileLayer(mapTileUrl()).addTo(awMap);
+const z=zonas.value.length?zonas.value:syntheticZones();
+z.forEach(zone=>{
+const radius=zone.no2*5;
+const col=aqiColor(zone.aqi);
+L.circle([zone.lat,zone.lon],{radius,color:col,fillColor:col,fillOpacity:0.3,weight:0}).addTo(awMap);
+L.circleMarker([zone.lat,zone.lon],{radius:6,color:col,fillColor:col,fillOpacity:1,weight:1})
+.addTo(awMap).bindPopup(`<div style="background:#161d2e;color:#fff;padding:8px"><b>${zone.name}</b><br>NO₂: ${zone.no2}<br>PM2.5: ${zone.pm25}</div>`);
+});
+};
+
+// INDICATORS
+const updateIndicators=()=>{
+const z=zonas.value;if(!z.length)return;
+const avg=(k)=>Math.round(z.reduce((s,x)=>s+(x[k]||0),0)/z.length);
+indicators.value=[
+{label:'NO₂ µg/m³',value:avg('no2'),color:avg('no2')>50?'#ff1744':'#00e676'},
+{label:'CO₂ µg/m³',value:avg('co2'),color:'#a78bfa'},
+{label:'PM10 µg/m³',value:avg('pm10'),color:'#fb923c'},
+{label:'PM2.5 µg/m³',value:avg('pm25'),color:'#f43f5e'},
+{label:'Ruido dB',value:avg('noise'),color:avg('noise')>65?'#ffea00':'#00e676'},
+];
+};
+
+// SCATTER CHART
+const initScatterChart=()=>{
+const ctx=document.getElementById('scatter-chart');if(!ctx)return;
+const z=zonas.value.length?zonas.value:syntheticZones();
+if(scatterChart)scatterChart.destroy();
+scatterChart=new Chart(ctx,{type:'scatter',data:{datasets:[{label:'Zonas A Coruña',data:z.map(x=>({x:x.traffic,y:x.no2,label:x.name})),backgroundColor:z.map(x=>aqiColor(x.aqi)),pointRadius:8,pointHoverRadius:12}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#94a3b8'}},tooltip:{callbacks:{label:p=>{const d=p.raw;return `${d.label}: Tráfico ${d.x}, NO₂ ${d.y}`;},}}},scales:{x:{title:{display:true,text:'Tráfico (veh/h)',color:'#94a3b8'},ticks:{color:'#94a3b8'},grid:{color:'rgba(255,255,255,.05)'}},y:{title:{display:true,text:'NO₂ (µg/m³)',color:'#94a3b8'},ticks:{color:'#94a3b8'},grid:{color:'rgba(255,255,255,.05)'}}}}});
+};
+
+// FORECAST CHART
+const initForecastChart=async()=>{
+const ctx=document.getElementById('forecast-chart');if(!ctx)return;
+let fcData=[];
+  try{
+  const sel = document.getElementById('zoneSelect');
+    const url = (sel && sel.value && sel.value!=='global') ? `${API}/api/airwatch?zone=${sel.value}` : `${API}/api/airwatch`;
+    const r = await fetch(url); const d = await r.json();
+    const fcs=d.forecasts||{};
+    const allZoneIds = Object.keys(fcs);
+    const forecastSel = document.getElementById('forecastZoneSelect');
+    const chosenZone = forecastSel ? forecastSel.value : 'all';
+    const zids = chosenZone && chosenZone !== 'all' ? allZoneIds.filter(zid => zid === chosenZone) : allZoneIds;
+const labels=['1h','2h','3h','4h','5h','6h'];
+const datasets = zids.map((zid,i)=>{
+  const arr = (fcs[zid]||[]);
+  // build an array of length equal to labels (6), fill with null where missing
+  const data = labels.map((_,idx)=>{
+    const found = arr.find(f => Number(f.hour) === idx+1);
+    return found ? Number(found.no2) : null;
+  });
+  const color = `hsl(${Math.round((i * 360) / Math.max(1, zids.length))}, 85%, 58%)`;
+  const zoneName = d.zones?.find(z=>z.id===zid)?.name || (zonas.value || []).find(z => z.id === zid)?.name || zid;
+  return {label: zoneName, data, borderColor:color, backgroundColor:'transparent', borderWidth:3, tension:0.35, pointBackgroundColor:color, pointRadius:3};
+});
+if(forecastChart)forecastChart.destroy();
+forecastChart=new Chart(ctx,{type:'line',data:{labels,datasets},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#94a3b8'},onClick:()=>{}},tooltip:{mode:'nearest',intersect:false}},scales:{x:{ticks:{color:'#94a3b8'},grid:{color:'rgba(255,255,255,.05)'}},y:{title:{display:true,text:'NO₂ (µg/m³)',color:'#94a3b8'},ticks:{color:'#94a3b8'},grid:{color:'rgba(255,255,255,.05)'}}}}});
+}catch(e){
+const labels=['1h','2h','3h','4h','5h','6h'];
+const zAll=syntheticZones();
+const forecastSel = document.getElementById('forecastZoneSelect');
+const chosenZone = forecastSel ? forecastSel.value : 'all';
+const z = chosenZone && chosenZone !== 'all' ? zAll.filter(x => x.id === chosenZone) : zAll;
+if(forecastChart)forecastChart.destroy();
+forecastChart=new Chart(ctx,{type:'line',data:{labels,datasets:z.map((x,i)=>({label:x.name,data:[x.no2*.9,x.no2*1.1,x.no2*1.3,x.no2*1.2,x.no2*1.0,x.no2*.8],borderColor:`hsl(${Math.round((i * 360) / Math.max(1, z.length))}, 85%, 58%)`,backgroundColor:'transparent',borderWidth:3,tension:0.35}))},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#94a3b8'},onClick:()=>{}}},scales:{x:{ticks:{color:'#94a3b8'},grid:{color:'rgba(255,255,255,.05)'}},y:{ticks:{color:'#94a3b8'},grid:{color:'rgba(255,255,255,.05)'}}}}}); }
+};
+
+// THREE.JS 3D (aggregated bars per zone)
+const init3D=()=>{
+  const container=document.getElementById('canvas3d');if(!container)return;
+  container.innerHTML='';
+  const W=container.clientWidth||800,H=container.clientHeight||420;
+  scene3d=new THREE.Scene();
+  camera3d=new THREE.PerspectiveCamera(50,W/H,0.1,1000);
+  renderer3d=new THREE.WebGLRenderer({antialias:true,alpha:true});
+  renderer3d.setSize(W,H); renderer3d.setClearColor(0x040812,1);
+  container.appendChild(renderer3d.domElement);
+
+  const gGeo=new THREE.PlaneGeometry(40,40);
+  const gMat=new THREE.MeshBasicMaterial({color:0x071028,side:THREE.DoubleSide});
+  const ground=new THREE.Mesh(gGeo,gMat);ground.rotation.x=-Math.PI/2;scene3d.add(ground);
+  const grid=new THREE.GridHelper(40,40,0x00e5ff,0x122036);grid.material.opacity=0.12;grid.material.transparent=true;scene3d.add(grid);
+  scene3d.add(new THREE.AmbientLight(0xffffff,0.6));
+  const dir=new THREE.DirectionalLight(0xffffff,0.8);dir.position.set(5,10,8);scene3d.add(dir);
+
+  // add variable selector UI
+  const sel = document.createElement('select'); sel.id='aw3dVar'; ['no2','pm25','pm10','co2','noise'].forEach(v=>{const o=document.createElement('option');o.value=v;o.text=v.toUpperCase();sel.appendChild(o);});
+  sel.style.position='absolute'; sel.style.left='14px'; sel.style.top='14px'; sel.style.zIndex=10; container.appendChild(sel);
+  const info = document.createElement('div'); info.style.position='absolute'; info.style.right='12px'; info.style.top='12px'; info.style.zIndex=10; info.style.color='#cbd5e1'; info.style.background='rgba(3,7,18,0.6)'; info.style.padding='6px 8px'; info.style.borderRadius='6px'; info.innerText='3D'; container.appendChild(info);
+
+  const z = zonas.value.length?zonas.value:syntheticZones();
+  if(!z.length){ info.innerText='No zones'; return; }
+
+  // projection meters per degree approx
+  const centerLat = 43.3623, centerLon = -8.4115;
+  const mLat = 110574, mLon = 111320 * Math.cos(centerLat * Math.PI/180);
+
+  // instanced mesh
+  const geom = new THREE.BoxGeometry(1,1,1);
+  const mat = new THREE.MeshStandardMaterial({vertexColors:true,transparent:true,opacity:0.95});
+  const inst = new THREE.InstancedMesh(geom, mat, z.length);
+  inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  scene3d.add(inst);
+
+  const dummy = new THREE.Object3D();
+  const color = new THREE.Color();
+  const values = z.map(zone=>({id:zone.id,name:zone.name,lat:zone.lat,lon:zone.lon,no2:zone.no2||0,pm25:zone.pm25||0,pm10:zone.pm10||0,co2:zone.co2||0,noise:zone.noise||0}));
+
+  const update = ()=>{
+    const varName = document.getElementById('aw3dVar').value || 'no2';
+    const maxV = Math.max(...values.map(v=>v[varName]||0), 1);
+    for(let i=0;i<values.length;i++){
+      const v=values[i];
+      const x=(v.lon-centerLon)*mLon/300; const zpos=-(v.lat-centerLat)*mLat/300;
+      const h = Math.max(0.4, (v[varName]||0)/maxV * 8);
+      dummy.position.set(x, h/2, zpos);
+      dummy.scale.set(0.9, h, 0.9);
+      dummy.updateMatrix(); inst.setMatrixAt(i, dummy.matrix);
+      const t = Math.min(1, (v[varName]||0)/maxV);
+      color.setHSL(0.33 - 0.33*t, 0.8, 0.45);
+      if(inst.instanceColor) inst.setColorAt(i, color); else inst.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(values.length*3),3); inst.setColorAt(i, color);
+    }
+    inst.instanceMatrix.needsUpdate = true;
+    if(inst.instanceColor) inst.instanceColor.needsUpdate = true;
+    info.innerText = `Var: ${varName.toUpperCase()} — max ${Math.round(maxV*10)/10}`;
+  };
+  sel.onchange = update; update();
+
+  // simple interactivity
+  const ray = new THREE.Raycaster(); const mouse = new THREE.Vector2();
+  const overlay = document.createElement('div'); overlay.style.position='absolute'; overlay.style.left='14px'; overlay.style.bottom='14px'; overlay.style.zIndex=10; overlay.style.color='#e2e8f0'; overlay.style.background='rgba(2,6,23,0.6)'; overlay.style.padding='6px 8px'; overlay.style.borderRadius='6px'; container.appendChild(overlay);
+  renderer3d.domElement.addEventListener('mousemove', (e)=>{
+    const rect = renderer3d.domElement.getBoundingClientRect(); mouse.x = ((e.clientX-rect.left)/rect.width)*2-1; mouse.y = -((e.clientY-rect.top)/rect.height)*2+1; ray.setFromCamera(mouse, camera3d);
+    const hits = ray.intersectObject(inst);
+    if(hits.length && hits[0].instanceId!=null){ const idx=hits[0].instanceId; const v=values[idx]; overlay.innerText = `${v.name}: ${sel.value.toUpperCase()}=${v[sel.value]}`; } else overlay.innerText = '';
+  });
+
+  camera3d.position.set(0,12,22); camera3d.lookAt(0,0,0);
+
+  const el=renderer3d.domElement; el.addEventListener('mousedown',e=>{isDragging=true;lastMouse={x:e.clientX,y:e.clientY};});
+  el.addEventListener('mousemove',e=>{if(!isDragging)return;rotY+=(e.clientX-lastMouse.x)*0.005;rotX+=(e.clientY-lastMouse.y)*0.005;rotX=Math.max(0,Math.min(1.2,rotX));lastMouse={x:e.clientX,y:e.clientY};});
+  el.addEventListener('mouseup',()=>{isDragging=false;}); el.addEventListener('wheel',e=>{camera3d.position.multiplyScalar(e.deltaY>0?1.05:0.95);});
+
+  const animate=()=>{requestAnimationFrame(animate);const r=18;camera3d.position.x=Math.sin(rotY)*r;camera3d.position.z=Math.cos(rotY)*r;camera3d.position.y=Math.max(3,rotX*18);camera3d.lookAt(0,0,0);renderer3d.render(scene3d,camera3d);};animate();
+};
+
+// ECORUTA MAP
+const initEcoMap=()=>{
+if(!document.getElementById('eco-map'))return;
+ecoMap=L.map('eco-map').setView([43.362,-8.41],12);
+L.tileLayer(mapTileUrl()).addTo(ecoMap);
+const z=zonas.value.length?zonas.value:syntheticZones();
+z.forEach(zone=>{L.circleMarker([zone.lat,zone.lon],{radius:6,color:'#00e5ff',fillColor:'#00e5ff',fillOpacity:0.4,weight:1}).addTo(ecoMap).bindPopup(zone.name);});
+};
+
+const drawEcoRoutes=async()=>{
+if(!ecoMap)return;
+ecoLayers.forEach(l=>ecoMap.removeLayer(l));ecoLayers=[];
+
+let profile = 'foot';
+if(tMode.value === 'car' || tMode.value === 'bus') profile = 'driving';
+else if(tMode.value === 'bike') profile = 'cycling';
+
+for(const r of rutas.value) {
+  const pts = r.points;
+  if(pts.length < 2) continue;
+  const coordsStr = pts.map(p => `${p.lon},${p.lat}`).join(';');
+  try {
+    const res = await fetch(`https://router.project-osrm.org/route/v1/${profile}/${coordsStr}?overview=full&geometries=geojson`);
+    const data = await res.json();
+    if(data.routes && data.routes.length > 0) {
+      const latlngs = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+      const pl = L.polyline(latlngs, {color: r.color, weight: 6, opacity: 0.8});
+      pl.addTo(ecoMap);
+      ecoLayers.push(pl);
+      pl.bindTooltip(r.name, {sticky: true});
+      continue;
+    }
+  } catch(e) { console.error("OSRM error:", e); }
+
+  // fallback straight lines
+  const pl=L.polyline(pts.map(p=>[p.lat,p.lon]),{color:r.color,weight:6,opacity:0.8});
+  pl.addTo(ecoMap);ecoLayers.push(pl);
+  pl.bindTooltip(r.name,{sticky:true});
+}
+
+if(rutas.value.length&&rutas.value[0].points.length>1){
+const pts=rutas.value[0].points.map(p=>[p.lat,p.lon]);ecoMap.fitBounds(L.latLngBounds(pts),{padding:[30,30]});}
+};
+
+watch(lang, (value) => {
+  localStorage.setItem('urbs-lang', value);
+  if (chatMsgs.value.length && chatMsgs.value[0].id === 0) chatMsgs.value[0].text = greetingText(value);
+  if (rutas.value.length) drawEcoRoutes();
+  updateDashMap();
+  if (tab.value === 'airwatch') {
+    initScatterChart();
+    initForecastChart();
+  }
+  if (tab.value === 'greenscore') updateRadarChart();
+  if (tab.value === 'perfil') initImpactChart();
+  if (bestHours.value.length) updateBestHourChart();
+});
+
+watch(tMode, () => {
+  if(tab.value === 'ecoruta' && rutas.value.length > 0) drawEcoRoutes();
+});
+
+// BEST HOUR CHART
+const updateBestHourChart=()=>{
+const ctx=document.getElementById('besthour-chart');if(!ctx||!bestHours.value.length)return;
+const h=bestHours.value;const minAqi=Math.min(...h.map(x=>x.aqi));const bestH=h.find(x=>x.aqi===minAqi);
+if(besthourChart)besthourChart.destroy();
+besthourChart=new Chart(ctx,{type:'bar',data:{labels:h.map(x=>x.hour),datasets:[{label:t('bestHourLabel'),data:h.map(x=>x.aqi),backgroundColor:h.map(x=>x.aqi<100?'rgba(0,230,118,0.7)':x.aqi<150?'rgba(255,234,0,0.7)':'rgba(255,23,68,0.7)'),borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{afterLabel:()=>`${t('bestHourHint')}${bestH?.hour || 'N/A'}`}}},scales:{x:{ticks:{color:'#94a3b8',maxRotation:0,maxTicksLimit:12},grid:{color:'rgba(255,255,255,.05)'}},y:{title:{display:true,text:t('predAqi'),color:'#94a3b8'},ticks:{color:'#94a3b8'},grid:{color:'rgba(255,255,255,.05)'}}}}});
+};
+
+// GREENSCORE MAP
+const initGSMap=()=>{
+if(!document.getElementById('gs-map'))return;
+gsMap=L.map('gs-map').setView([43.362,-8.41],12);
+L.tileLayer(mapTileUrl()).addTo(gsMap);
+};
+const updateGSMap=()=>{
+if(!gsMap)return;
+gsLayers.forEach(l=>gsMap.removeLayer(l));gsLayers=[];
+const z=gsRanked.value.length?gsRanked.value:(zonas.value.length?zonas.value:syntheticZones());
+z.forEach(zone=>{
+const col=zoneColor(zone.greenScore);
+const r=L.circle([zone.lat,zone.lon],{radius:700,color:col,fillColor:col,fillOpacity:0.3,weight:2}).addTo(gsMap);
+r.bindPopup(`<div style="background:#161d2e;color:#fff;padding:8px;border-radius:6px"><b>${zone.name}</b><br>GreenScore: <b>${zone.greenScore}</b>/100<br>ML: ${zone.mlPrediction||'N/A'}</div>`);
+gsLayers.push(r);
+L.circleMarker([zone.lat,zone.lon],{radius:6,color:col,fillColor:col,fillOpacity:1,weight:2}).addTo(gsMap);
+});
+};
+
+// RADAR CHART
+const updateRadarChart=()=>{
+const ctx=document.getElementById('radar-chart');if(!ctx)return;
+const top3=(gsRanked.value.length?gsRanked.value:syntheticZones()).slice(0,3);
+if(radarChart)radarChart.destroy();
+const colors=['rgba(0,229,255,0.8)','rgba(0,230,118,0.8)','rgba(255,234,0,0.8)'];
+radarChart=new Chart(ctx,{type:'radar',data:{labels:['Calidad Aire','Ruido (Bajo)','Tráfico (Bajo)','Predictivo ML','GreenScore'],datasets:top3.map((z,i)=>({label:z.name,data:[100-Math.min(100,(z.no2||50)),100-Math.min(100,(z.noise||60)),100-Math.min(100,(z.traffic||500)/10),z.mlPrediction||z.greenScore,z.greenScore],backgroundColor:colors[i].replace('0.8','0.2'),borderColor:colors[i],borderWidth:2,pointBackgroundColor:colors[i]}))},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#cbd5e1',font:{size:12}}}},scales:{r:{ticks:{color:'#94a3b8',backdropColor:'transparent'},grid:{color:'rgba(0,229,255,0.2)'},angleLines:{color:'rgba(0,229,255,0.2)'},pointLabels:{color:'#cbd5e1',font:{size:11}}}}}});
+};
+
+// IMPACT CHART
+const initImpactChart=()=>{
+const ctx=document.getElementById('impact-chart');if(!ctx)return;
+if(impactChart)impactChart.destroy();
+impactChart=new Chart(ctx,{type:'line',data:{labels:['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'],datasets:[{label:'Impacto Positivo (Puntos)',data:[12,24,18,35,42,28,45],borderColor:'#00e5ff',backgroundColor:'rgba(0,229,255,0.2)',borderWidth:3,pointBackgroundColor:'#00e5ff',pointRadius:5,fill:true,tension:0.4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#94a3b8'}},x:{grid:{display:false},ticks:{color:'#94a3b8'}}}}});
+};
+
+// CHAT
+const sendChat=async()=>{
+const msg=chatIn.value.trim();if(!msg)return;
+chatMsgs.value.push({id:chatId++,text:msg,u:true});chatIn.value='';
+  try{const r=await fetch(`${API}/api/chat`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:msg, mode: viewMode.value, lang: lang.value})});const d=await r.json();chatMsgs.value.push({id:chatId++,text:d.response,u:false});}
+  catch(e){chatMsgs.value.push({id:chatId++,text:offlineText(lang.value),u:false});}
+setTimeout(()=>{const el=document.getElementById('chat-msgs');if(el)el.scrollTop=el.scrollHeight;},100);
+};
+
+// TAB WATCH
+watch(tab,async(t)=>{
+if(t==='airwatch'){
+setTimeout(()=>{initAWMap();initScatterChart();init3D();initForecastChart();},300);
+}else if(t==='ecoruta'){
+setTimeout(()=>{initEcoMap(); if(rutas.value.length)drawEcoRoutes();},300);
+}else if(t==='greenscore'){
+await fetchGS();setTimeout(()=>{initGSMap();updateGSMap();updateRadarChart();},300);
+}else if(t==='perfil'){
+setTimeout(()=>{initImpactChart();},300);
+}
+});
+
+onMounted(async()=>{
+document.body.classList.toggle('light-mode', isLight.value);
+await fetchDash();
+  // initialize hero phrase and mascot animation
+  heroPhrase.value = getHeroPhrase(lang.value);
+  if (tab.value === 'dashboard') { mascotAnimate.value = true; }
+setTimeout(()=>{initDashMap();updateDashMap();},400);
+setInterval(fetchDash,30000);
+});
+
+return{isEditingProfile, profileAvatarZoomed, tab,zonas,dash,gsRanked,bestZone,rutas,bestHours,ecoOrigen,ecoDest,chatOpen,chatIn,chatMsgs,indicators,calcRuta,sendChat,formatTs,tMode,getRouteStats, viewMode, lang, isLight, t, profileName, editingName, editName, profileAvatar, triggerAvatarUpload, handleAvatarUpload, heroPhrase, mascotAnimate};
+}}).mount('#app');
+}
+
+startUrbanPulseApp();
+</script>
 </body>
 </html>

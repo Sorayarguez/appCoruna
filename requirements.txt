@@ -1,8 +1,9 @@
-fastapi
-uvicorn
+flask
+flask-cors
 requests
 pandas
 geopandas
 scikit-learn
 faker
 paho-mqtt
+Shapely
