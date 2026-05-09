@@ -1,65 +1,80 @@
-# URBS - Urban Real-time Biosphere System (A Coruña)
+# appCoruna / URBS
 
-URBS es una aplicación integral basada en FIWARE para la monitorización ambiental urbana, correlacionando el tráfico vehicular con la calidad del aire en tiempo real.
+appCoruna es una plataforma web de monitorización urbana para A Coruña. La interfaz principal combina mapas, paneles analíticos, predicciones, rutas sostenibles, ranking ambiental y un asistente conversacional en una sola experiencia.
 
-## 🏗 Arquitectura y Módulos
+## Funcionalidad visible en la web
 
-El sistema está compuesto por 3 módulos principales integrados:
+- Dashboard global con KPIs, alertas y diagrama FIWARE.
+- AirWatch con mapa, vista 3D, correlación tráfico/contaminación y previsión horaria.
+- EcoRuta con selección de origen, destino y modo, más tres rutas comparativas.
+- GreenScore con ranking de barrios, radar comparativo y mapa de salubridad.
+- Histórico con series temporales y exportación.
+- Perfil de usuario con logros y asistente URBS.
+- Grafana embebido para visualizar paneles temporales.
 
-1. **GreenRoute**: Cálculo de rutas saludables basado en el índice de calidad del aire (NO2 y PM2.5).
-2. **UrbanPulse**: Panel de control con gráficas correlacionadas de tráfico/contaminación y explicaciones generadas con fallback local cuando no hay servicio de IA disponible.
-3. **EcoZones**: Gestión dinámica de Zonas de Bajas Emisiones (ZBE) mediante un sistema de alertas.
+## Stack
 
-## 💾 Smart Data Models (NGSI v2)
-Se implementan 4 modelos de datos clave, enlazados mediante referencias (Relationships):
-- `TrafficFlowObserved`: Registra intensidad, velocidad y ocupación de las vías.
-- `ItemFlowObserved`: Registra el paso de peatones o ciclistas.
-- `TrafficEnvironmentImpact`: Registra mediciones ambientales actuales y referencia (`refTrafficFlowObserved`) al tramo que lo origina.
-- `TrafficEnvironmentImpactForecast`: Proyecciones futuras (+1h, +2h, +4h) originadas por el modelo de ML.
+- Backend: Flask.
+- Frontend: HTML, CSS y JavaScript sin framework en la versión raíz.
+- Visualización: Leaflet, Chart.js, Three.js y Mermaid.
+- Datos: FIWARE Orion, simulación local y fallback sintético.
+- Despliegue: Docker Compose para el stack completo.
 
-*(Consulta el fichero `ngsi_entities.json` para ver ejemplos completos y relaciones).*
+## Cómo arrancar
 
-## 🚀 Despliegue (Paso a Paso)
-
-Todo el proyecto está dockerizado para facilitar el despliegue de todos los componentes FIWARE (Orion, IoT Agent, QuantumLeap, CrateDB), Grafana y el Backend/Frontend personalizado.
-
-1. **Clonar el repositorio y ubicarse en la carpeta**
-   ```bash
-   cd /home/soraya/xdei/P3/appCoruna
-   ```
-
-2. **Levantar todos los contenedores con Docker Compose**
-   ```bash
-   docker compose up -d
-   ```
-   *Nota: La primera vez descargará bastantes imágenes oficiales de FIWARE y BDs.*
-
-3. **Instalar dependencias de Python** (para lanzar los simuladores localmente):
+1. Instala dependencias Python.
    ```bash
    pip install -r requirements.txt
    ```
 
-4. **Iniciar el Simulador IoT (Ingesta de datos)**
-   El simulador registrará los servicios y dispositivos, y comenzará a inyectar datos sintéticos para A Coruña mediante MQTT (tráfico) y HTTP (ambiente).
+2. Levanta el stack completo, incluyendo Grafana.
    ```bash
-   python simulator.py
+   docker compose up -d
    ```
 
-5. **Iniciar el modelo predictivo ML (En otra terminal)**
-   Este script lee el estado actual de Orion y sube nuevas entidades de tipo "Forecast" simulando proyecciones futuras.
+3. Si quieres ejecutar solo el backend localmente.
    ```bash
+   python main.py
+   ```
+
+4. Si quieres datos simulados adicionales.
+   ```bash
+   python simulator.py
    python ml_predictor.py
    ```
 
-## 🌍 Acceso e Interfaz de Usuario
+## Endpoints principales
 
-- **Frontend Principal (Leaflet, Three.js, Chart.js)**: [http://localhost](http://localhost)
-- **API FastAPI (Swagger UI)**: [http://localhost:8000/docs](http://localhost:8000/docs)
-- **Grafana (Dashboard Analítico)**: [http://localhost:3000](http://localhost:3000) (Importar el fichero `grafana_dashboard.json`).
+- `/api/zones`: zonas con métricas actuales.
+- `/api/dashboard`: KPIs globales y alertas.
+- `/api/airwatch`: series de zonas y forecasts.
+- `/api/ecoruta`: cálculo de rutas alternativas.
+- `/api/greenscore`: ranking y predicción ambiental.
+- `/api/chat`: asistente URBS.
+- `/api/explain/<zone_id>`: explicación de tráfico/contaminación.
+- `/api/ecozones/<zone_id>/activate` y `/api/ecozones/<zone_id>/deactivate`: gestión ZBE.
 
-## ⚙️ Decisiones Tecnológicas Destacadas
+## Interfaz
 
-- **Backend**: FastAPI por su extrema velocidad y simplicidad para mapear rutas RESTful.
-- **Frontend**: Vanilla HTML5/JS/CSS3 usando CSS Grid, variables CSS, glassmorphism, y sin frameworks bloqueantes para una PWA ligera y visualmente impactante.
-- **Visualización 3D**: Uso de `THREE.Points` para renderizar volumétricamente una simulación de partículas de polución.
-- **IA Generativa**: El backend usa respuestas locales y solo consume un servicio externo de IA si se configura explícitamente mediante `OLLAMA_URL`.
+- El modo oscuro es el predeterminado.
+- El modo claro mantiene contraste adecuado en dashboard, cards, inputs y mapas.
+- EcoRuta diferencia visualmente la ruta ecoóptima, la alternativa y la rápida.
+- La web es responsiva y se adapta a pantallas pequeñas apilando sidebar, tarjetas, mapas y chat.
+
+## Grafana
+
+- La vista embebida usa el panel `urbs-dashboard` expuesto por Grafana.
+- El contenedor Grafana está configurado para permitir embedding y acceso anónimo de solo lectura.
+- Si trabajas sin Docker, el panel depende de que el servicio `localhost:3000` esté activo.
+
+## Provisioning y seeders
+
+- Los dashboards y el datasource se provisionan desde `./grafana/provisioning` y `./grafana/dashboards`.
+- Hay un seeder `seed_grafana.py` que crea las tablas `ettrafficenvironmentimpact` y `ettrafficflowobserved` en CrateDB (esquema `doc`) y las rellena con datos sintéticos.
+- Para poblar CrateDB manualmente:
+
+```bash
+docker compose run --rm grafana-seed
+```
+
+Esto insertará filas coherentes con las entidades de `seed_data.py` y añadirá algunas alertas de prueba para verificar los paneles.

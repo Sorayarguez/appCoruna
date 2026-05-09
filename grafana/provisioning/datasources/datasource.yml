@@ -1,0 +1,21 @@
+apiVersion: 1
+
+datasources:
+  - name: CrateDB
+    uid: cratedb
+    type: postgres
+    access: proxy
+    url: cratedb:5432
+    database: doc
+    user: crate
+    secureJsonData:
+      password: ""
+    jsonData:
+      database: doc
+      sslmode: disable
+      postgresVersion: 1500
+      timescaledb: false
+      maxOpenConns: 50
+      maxIdleConns: 25
+      connMaxLifetime: 14400
+    isDefault: true
