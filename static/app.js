@@ -93,44 +93,112 @@ loadDashboard();
 
 // 3D AirWatch Scene
 function init3D() {
-    const container = document.getElementById('airwatch-3d');
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0f172a);
-    
-    const camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    
-    renderer.setSize(container.clientWidth, container.clientHeight);
-    container.appendChild(renderer.domElement);
-    
-    // Add simple plane
-    const plane = new THREE.Mesh(
-        new THREE.PlaneGeometry(10, 10, 10, 10),
-        new THREE.MeshBasicMaterial({ color: 0x1e293b, wireframe: true })
-    );
-    plane.rotation.x = -Math.PI / 2;
-    scene.add(plane);
-    
-    // Add columns
-    const geoms = new THREE.BoxGeometry(0.5, 1, 0.5);
-    for(let i=0; i<5; i++) {
-        const mat = new THREE.MeshBasicMaterial({ color: Math.random() > 0.5 ? 0xef4444 : 0x22c55e, opacity: 0.8, transparent: true });
-        const mesh = new THREE.Mesh(geoms, mat);
-        mesh.position.set((Math.random() - 0.5) * 8, 0.5, (Math.random() - 0.5) * 8);
-        mesh.scale.y = Math.random() * 3 + 1;
-        mesh.position.y = mesh.scale.y / 2;
-        scene.add(mesh);
-    }
-    
-    camera.position.set(0, 5, 8);
-    camera.lookAt(0, 0, 0);
-    
-    function animate() {
-        requestAnimationFrame(animate);
-        scene.rotation.y += 0.005;
-        renderer.render(scene, camera);
-    }
-    animate();
+        const container = document.getElementById('airwatch-3d');
+        if(!container) return;
+        // clear previous
+        container.innerHTML = '';
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0b1220);
+
+        const camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        container.appendChild(renderer.domElement);
+
+        // simple orbit controls if available
+        if(THREE.OrbitControls){
+            const controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.target.set(0,0,0);
+            controls.update();
+        }
+
+        // UI: variable selector
+        const varSel = document.createElement('select');
+        varSel.id = 'aw3dVar';
+        ['no2','pm25','pm10','co2','noise'].forEach(v=>{const o=document.createElement('option');o.value=v;o.text=v.toUpperCase();varSel.appendChild(o);});
+        varSel.style.position='absolute'; varSel.style.left='12px'; varSel.style.top='12px'; varSel.style.zIndex=10; container.appendChild(varSel);
+
+        // tooltip overlay
+        const tip = document.createElement('div');
+        tip.style.position='absolute'; tip.style.right='12px'; tip.style.top='12px'; tip.style.zIndex=10; tip.style.color='#cbd5e1'; tip.style.background='rgba(3,7,18,0.6)'; tip.style.padding='6px 8px'; tip.style.borderRadius='6px';
+        tip.innerText = '3D: cargando...'; container.appendChild(tip);
+
+        // fetch zones and build instanced bars
+        const build = async () => {
+            tip.innerText = 'Cargando zonas...';
+            let zones=[];
+            try{const r = await fetch('/api/zones'); zones = await r.json();}catch(e){ zones = [] }
+            if(!zones || !zones.length){ tip.innerText='No hay datos'; return; }
+
+            // projection constants (meters per deg)
+            const centerLat = 43.3623, centerLon = -8.4115; // approximate center
+            const metersPerDegLat = 110574;
+            const metersPerDegLon = 111320 * Math.cos(centerLat * Math.PI/180);
+
+            const count = zones.length;
+            const geom = new THREE.BoxGeometry(1, 1, 1);
+            const material = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true });
+            const inst = new THREE.InstancedMesh(geom, material, count);
+            inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+            scene.add(inst);
+
+            // color attribute per instance via color buffer
+            const color = new THREE.Color();
+            const dummy = new THREE.Object3D();
+            const values = zones.map(z=>({id:z.id,name:z.name,lat:z.lat,lon:z.lon,no2:z.no2||0,pm25:z.pm25||0,pm10:z.pm10||0,co2:z.co2||0,noise:z.noise||0}));
+
+            const updateInstances = () => {
+                const varName = document.getElementById('aw3dVar').value || 'no2';
+                const maxVal = Math.max(...values.map(v=>v[varName]||0), 1);
+                for(let i=0;i<values.length;i++){
+                    const v = values[i];
+                    const dx = (v.lon - centerLon) * metersPerDegLon / 200; // scale down
+                    const dz = (v.lat - centerLat) * metersPerDegLat / 200;
+                    const height = Math.max(0.5, (v[varName]||0) / maxVal * 6);
+                    dummy.position.set(dx, height/2, -dz);
+                    dummy.scale.set(0.8, height, 0.8);
+                    dummy.updateMatrix();
+                    inst.setMatrixAt(i, dummy.matrix);
+                    // color gradient green->yellow->red
+                    const t = Math.min(1, (v[varName]||0)/maxVal);
+                    color.setHSL((0.33 - 0.33*t), 0.8, 0.5);
+                    inst.setColorAt(i, color);
+                }
+                inst.instanceMatrix.needsUpdate = true;
+                if(inst.instanceColor) inst.instanceColor.needsUpdate = true;
+                tip.innerText = `Variable: ${varName.toUpperCase()} — max ${Math.round(maxVal*10)/10}`;
+            };
+
+            // initial camera framing
+            camera.position.set(0, 10, 18);
+            camera.lookAt(0, 0, 0);
+
+            varSel.onchange = updateInstances;
+            updateInstances();
+
+            // simple hover: raycaster
+            const ray = new THREE.Raycaster();
+            const mouse = new THREE.Vector2();
+            const overlay = document.createElement('div'); overlay.style.position='absolute'; overlay.style.left='12px'; overlay.style.bottom='12px'; overlay.style.zIndex=10; overlay.style.color='#e2e8f0'; overlay.style.background='rgba(2,6,23,0.6)'; overlay.style.padding='6px 8px'; overlay.style.borderRadius='6px'; overlay.innerText='Hover: zona'; container.appendChild(overlay);
+            function onMove(e){
+                const rect = renderer.domElement.getBoundingClientRect();
+                mouse.x = ((e.clientX-rect.left)/rect.width)*2-1; mouse.y = -((e.clientY-rect.top)/rect.height)*2+1;
+                ray.setFromCamera(mouse, camera);
+                const intersects = ray.intersectObject(inst);
+                if(intersects.length){ const idx = intersects[0].instanceId; if(idx!=null){ const z = values[idx]; overlay.innerText = `${z.name}: ${document.getElementById('aw3dVar').value.toUpperCase()}=${z[document.getElementById('aw3dVar').value]}`; } }
+            }
+            renderer.domElement.addEventListener('mousemove', onMove);
+
+        };
+
+        build();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            scene.rotation.y += 0.002;
+            renderer.render(scene, camera);
+        }
+        animate();
 }
 // Init slightly after to ensure dimensions
 setTimeout(init3D, 500);

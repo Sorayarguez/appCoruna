@@ -1218,56 +1218,83 @@ if(forecastChart)forecastChart.destroy();
 forecastChart=new Chart(ctx,{type:'line',data:{labels,datasets:z.map((x,i)=>({label:x.name,data:[x.no2*.9,x.no2*1.1,x.no2*1.3,x.no2*1.2,x.no2*1.0,x.no2*.8],borderColor:['#00e5ff','#00e676','#ffea00'][i],backgroundColor:'transparent',borderWidth:3,tension:0.4}))},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#94a3b8'}}},scales:{x:{ticks:{color:'#94a3b8'},grid:{color:'rgba(255,255,255,.05)'}},y:{ticks:{color:'#94a3b8'},grid:{color:'rgba(255,255,255,.05)'}}}}}); }
 };
 
-// THREE.JS 3D
+// THREE.JS 3D (aggregated bars per zone)
 const init3D=()=>{
-const container=document.getElementById('canvas3d');if(!container)return;
-const W=container.clientWidth||800,H=420;
-scene3d=new THREE.Scene();
-camera3d=new THREE.PerspectiveCamera(45,W/H,0.1,1000);
-renderer3d=new THREE.WebGLRenderer({antialias:true,alpha:true});
-renderer3d.setSize(W,H);
-renderer3d.setClearColor(0x030712,1);
-container.appendChild(renderer3d.domElement);
+  const container=document.getElementById('canvas3d');if(!container)return;
+  container.innerHTML='';
+  const W=container.clientWidth||800,H=container.clientHeight||420;
+  scene3d=new THREE.Scene();
+  camera3d=new THREE.PerspectiveCamera(50,W/H,0.1,1000);
+  renderer3d=new THREE.WebGLRenderer({antialias:true,alpha:true});
+  renderer3d.setSize(W,H); renderer3d.setClearColor(0x040812,1);
+  container.appendChild(renderer3d.domElement);
 
-const gGeo=new THREE.PlaneGeometry(20,20);
-const gMat=new THREE.MeshBasicMaterial({color:0x0b1120,side:THREE.DoubleSide});
-const ground=new THREE.Mesh(gGeo,gMat);ground.rotation.x=-Math.PI/2;scene3d.add(ground);
+  const gGeo=new THREE.PlaneGeometry(40,40);
+  const gMat=new THREE.MeshBasicMaterial({color:0x071028,side:THREE.DoubleSide});
+  const ground=new THREE.Mesh(gGeo,gMat);ground.rotation.x=-Math.PI/2;scene3d.add(ground);
+  const grid=new THREE.GridHelper(40,40,0x00e5ff,0x122036);grid.material.opacity=0.12;grid.material.transparent=true;scene3d.add(grid);
+  scene3d.add(new THREE.AmbientLight(0xffffff,0.6));
+  const dir=new THREE.DirectionalLight(0xffffff,0.8);dir.position.set(5,10,8);scene3d.add(dir);
 
-const grid=new THREE.GridHelper(20,20,0x00e5ff,0x1e3050);
-grid.material.opacity=0.2; grid.material.transparent=true;
-scene3d.add(grid);
+  // add variable selector UI
+  const sel = document.createElement('select'); sel.id='aw3dVar'; ['no2','pm25','pm10','co2','noise'].forEach(v=>{const o=document.createElement('option');o.value=v;o.text=v.toUpperCase();sel.appendChild(o);});
+  sel.style.position='absolute'; sel.style.left='14px'; sel.style.top='14px'; sel.style.zIndex=10; container.appendChild(sel);
+  const info = document.createElement('div'); info.style.position='absolute'; info.style.right='12px'; info.style.top='12px'; info.style.zIndex=10; info.style.color='#cbd5e1'; info.style.background='rgba(3,7,18,0.6)'; info.style.padding='6px 8px'; info.style.borderRadius='6px'; info.innerText='3D'; container.appendChild(info);
 
-const ambL=new THREE.AmbientLight(0xffffff,0.6);scene3d.add(ambL);
-const dirL=new THREE.DirectionalLight(0x00e5ff,1);dirL.position.set(5,10,5);scene3d.add(dirL);
+  const z = zonas.value.length?zonas.value:syntheticZones();
+  if(!z.length){ info.innerText='No zones'; return; }
 
-const z=zonas.value.length?zonas.value:syntheticZones();
-const latC=43.36,lonC=-8.41,scale=80;
-z.forEach(zone=>{
-const x=(zone.lon-lonC)*scale;
-const zz=-(zone.lat-latC)*scale;
-const h=Math.max(0.2,zone.no2/12);
-const col=zone.no2>55?0xff1744:zone.no2>35?0xffea00:0x00e676;
-const geo=new THREE.CylinderGeometry(0.15,0.25,h,12);
-const mat=new THREE.MeshPhongMaterial({color:col,transparent:true,opacity:0.8,emissive:col,emissiveIntensity:0.4});
-const bar=new THREE.Mesh(geo,mat);
-bar.position.set(x,h/2,zz);
-scene3d.add(bar);
-const sGeo=new THREE.SphereGeometry(0.15,16,16);
-const sMat=new THREE.MeshBasicMaterial({color:col});
-const sphere=new THREE.Mesh(sGeo,sMat);sphere.position.set(x,h+0.15,zz);scene3d.add(sphere);
-});
+  // projection meters per degree approx
+  const centerLat = 43.3623, centerLon = -8.4115;
+  const mLat = 110574, mLon = 111320 * Math.cos(centerLat * Math.PI/180);
 
-camera3d.position.set(0,8,14);camera3d.lookAt(0,0,0);
+  // instanced mesh
+  const geom = new THREE.BoxGeometry(1,1,1);
+  const mat = new THREE.MeshStandardMaterial({vertexColors:true,transparent:true,opacity:0.95});
+  const inst = new THREE.InstancedMesh(geom, mat, z.length);
+  inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  scene3d.add(inst);
 
-const el=renderer3d.domElement;
-el.addEventListener('mousedown',e=>{isDragging=true;lastMouse={x:e.clientX,y:e.clientY};});
-el.addEventListener('mousemove',e=>{if(!isDragging)return;rotY+=(e.clientX-lastMouse.x)*0.005;rotX+=(e.clientY-lastMouse.y)*0.005;rotX=Math.max(0,Math.min(1.2,rotX));lastMouse={x:e.clientX,y:e.clientY};});
-el.addEventListener('mouseup',()=>{isDragging=false;});
-el.addEventListener('wheel',e=>{camera3d.position.multiplyScalar(e.deltaY>0?1.05:0.95);});
+  const dummy = new THREE.Object3D();
+  const color = new THREE.Color();
+  const values = z.map(zone=>({id:zone.id,name:zone.name,lat:zone.lat,lon:zone.lon,no2:zone.no2||0,pm25:zone.pm25||0,pm10:zone.pm10||0,co2:zone.co2||0,noise:zone.noise||0}));
 
-const animate=()=>{requestAnimationFrame(animate);
-const r=14;camera3d.position.x=Math.sin(rotY)*r;camera3d.position.z=Math.cos(rotY)*r;camera3d.position.y=Math.max(2,rotX*14);camera3d.lookAt(0,0,0);
-renderer3d.render(scene3d,camera3d);};animate();
+  const update = ()=>{
+    const varName = document.getElementById('aw3dVar').value || 'no2';
+    const maxV = Math.max(...values.map(v=>v[varName]||0), 1);
+    for(let i=0;i<values.length;i++){
+      const v=values[i];
+      const x=(v.lon-centerLon)*mLon/300; const zpos=-(v.lat-centerLat)*mLat/300;
+      const h = Math.max(0.4, (v[varName]||0)/maxV * 8);
+      dummy.position.set(x, h/2, zpos);
+      dummy.scale.set(0.9, h, 0.9);
+      dummy.updateMatrix(); inst.setMatrixAt(i, dummy.matrix);
+      const t = Math.min(1, (v[varName]||0)/maxV);
+      color.setHSL(0.33 - 0.33*t, 0.8, 0.45);
+      if(inst.instanceColor) inst.setColorAt(i, color); else inst.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(values.length*3),3); inst.setColorAt(i, color);
+    }
+    inst.instanceMatrix.needsUpdate = true;
+    if(inst.instanceColor) inst.instanceColor.needsUpdate = true;
+    info.innerText = `Var: ${varName.toUpperCase()} — max ${Math.round(maxV*10)/10}`;
+  };
+  sel.onchange = update; update();
+
+  // simple interactivity
+  const ray = new THREE.Raycaster(); const mouse = new THREE.Vector2();
+  const overlay = document.createElement('div'); overlay.style.position='absolute'; overlay.style.left='14px'; overlay.style.bottom='14px'; overlay.style.zIndex=10; overlay.style.color='#e2e8f0'; overlay.style.background='rgba(2,6,23,0.6)'; overlay.style.padding='6px 8px'; overlay.style.borderRadius='6px'; container.appendChild(overlay);
+  renderer3d.domElement.addEventListener('mousemove', (e)=>{
+    const rect = renderer3d.domElement.getBoundingClientRect(); mouse.x = ((e.clientX-rect.left)/rect.width)*2-1; mouse.y = -((e.clientY-rect.top)/rect.height)*2+1; ray.setFromCamera(mouse, camera3d);
+    const hits = ray.intersectObject(inst);
+    if(hits.length && hits[0].instanceId!=null){ const idx=hits[0].instanceId; const v=values[idx]; overlay.innerText = `${v.name}: ${sel.value.toUpperCase()}=${v[sel.value]}`; } else overlay.innerText = '';
+  });
+
+  camera3d.position.set(0,12,22); camera3d.lookAt(0,0,0);
+
+  const el=renderer3d.domElement; el.addEventListener('mousedown',e=>{isDragging=true;lastMouse={x:e.clientX,y:e.clientY};});
+  el.addEventListener('mousemove',e=>{if(!isDragging)return;rotY+=(e.clientX-lastMouse.x)*0.005;rotX+=(e.clientY-lastMouse.y)*0.005;rotX=Math.max(0,Math.min(1.2,rotX));lastMouse={x:e.clientX,y:e.clientY};});
+  el.addEventListener('mouseup',()=>{isDragging=false;}); el.addEventListener('wheel',e=>{camera3d.position.multiplyScalar(e.deltaY>0?1.05:0.95);});
+
+  const animate=()=>{requestAnimationFrame(animate);const r=18;camera3d.position.x=Math.sin(rotY)*r;camera3d.position.z=Math.cos(rotY)*r;camera3d.position.y=Math.max(3,rotX*18);camera3d.lookAt(0,0,0);renderer3d.render(scene3d,camera3d);};animate();
 };
 
 // ECORUTA MAP
