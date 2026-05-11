@@ -506,13 +506,18 @@ document.getElementById('btn-send-chat').addEventListener('click', async () => {
     input.value = '';
     chatWin.scrollTop = chatWin.scrollHeight;
     
-    chatWin.innerHTML += `<div class="message bot">Analizando tu solicitud usando FIWARE y OLLAMA... (simulado)</div>`;
+    chatWin.innerHTML += `<div class="message bot">Analizando tu solicitud...</div>`;
     chatWin.scrollTop = chatWin.scrollHeight;
     
     try {
-        const res = await fetch(`/api/explain/urn:ngsi-ld:RoadSegment:CalleReal`);
+        const res = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: msg, mode: state.mode, lang: state.lang })
+        });
         const data = await res.json();
-        chatWin.innerHTML += `<div class="message bot">${data.explanation || "No pude conectar con el modelo."}</div>`;
+        const reply = data.response || data.explanation || "No pude conectar con el modelo.";
+        chatWin.innerHTML += `<div class="message bot">${reply}</div>`;
     } catch(e) {
         chatWin.innerHTML += `<div class="message bot">Lo siento, hubo un error de conexión con mi núcleo.</div>`;
     }
