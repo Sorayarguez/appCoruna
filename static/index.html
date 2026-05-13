@@ -151,7 +151,8 @@
             </div>
             <div class="grafana-container glass">
                 <h3>Grafana Dashboards</h3>
-                <iframe src="http://localhost:3000/d/urbs-dashboard" frameborder="0"></iframe>
+                <div id="grafana-loading" class="grafana-loading">Cargando dashboards...</div>
+                <iframe id="grafana-iframe" src="" frameborder="0" style="display:none;"></iframe>
             </div>
         </section>
 

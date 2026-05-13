@@ -523,3 +523,52 @@ document.getElementById('btn-send-chat').addEventListener('click', async () => {
     }
     chatWin.scrollTop = chatWin.scrollHeight;
 });
+
+// Grafana Dashboard Loading with Health Check
+async function loadGrafanaDashboard() {
+    const iframe = document.getElementById('grafana-iframe');
+    const loading = document.getElementById('grafana-loading');
+    const maxRetries = 30;
+    const retryInterval = 2000; // 2 segundos
+    
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+            // Probar que Grafana está listo
+            const response = await fetch('/grafana/api/health');
+            if (response.ok) {
+                // Grafana está listo, mostrar iframe
+                iframe.src = '/grafana/d/urbs-dashboard';
+                iframe.style.display = 'block';
+                loading.style.display = 'none';
+                console.log('Grafana dashboard cargado correctamente');
+                return;
+            }
+        } catch (error) {
+            console.log(`Intento ${attempt + 1}/${maxRetries}: Esperando a Grafana...`);
+        }
+        
+        // Esperar antes de reintentar
+        await new Promise(resolve => setTimeout(resolve, retryInterval));
+    }
+    
+    // Si se agotaron los reintentos, mostrar mensaje de error
+    loading.innerHTML = 'Error: No se pudo conectar con Grafana. Por favor, recarga la página.';
+    loading.style.color = '#ef4444';
+}
+
+// Cargar dashboard cuando se acceda a la pestaña de Histórico
+const historicoTab = document.querySelector('[data-target="historico"]');
+if (historicoTab) {
+    historicoTab.addEventListener('click', () => {
+        // Solo cargar si no se ha cargado aún
+        if (document.getElementById('grafana-iframe').src === '') {
+            loadGrafanaDashboard();
+        }
+    });
+}
+
+// O cargar automáticamente después de que la página esté lista
+document.addEventListener('DOMContentLoaded', () => {
+    // Esperar un poco para que todo esté preparado
+    setTimeout(loadGrafanaDashboard, 1000);
+});
