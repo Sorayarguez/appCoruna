@@ -8,6 +8,35 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// Logo modal behavior
+document.addEventListener('DOMContentLoaded', function(){
+  try{
+    const logo = document.getElementById('sidebar-logo');
+    const modal = document.getElementById('logo-modal');
+    const backdrop = document.getElementById('logo-modal-backdrop');
+    const closeBtn = document.getElementById('logo-modal-close');
+    const modalImg = document.getElementById('logo-modal-img');
+
+    function openModal(){
+      if(!modal) return;
+      modal.classList.add('open');
+      modal.setAttribute('aria-hidden','false');
+      // ensure image uses same src as logo (if changed by user)
+      if(logo && modalImg) modalImg.src = logo.src || modalImg.src;
+    }
+    function closeModal(){
+      if(!modal) return;
+      modal.classList.remove('open');
+      modal.setAttribute('aria-hidden','true');
+    }
+    if(logo) logo.addEventListener('click', openModal);
+    if(backdrop) backdrop.addEventListener('click', closeModal);
+    if(closeBtn) closeBtn.addEventListener('click', closeModal);
+    document.addEventListener('keydown', function(e){ if(e.key === 'Escape') closeModal(); });
+  }catch(e){ console.warn('logo modal init failed', e); }
+});
+</script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
@@ -364,8 +393,8 @@ body {
 .mascot-plate { display:none; }
 .mascot-plate img { display:none; }
 /* Hero image fills the right side */
-.hero-mascot { flex: 0 0 38%; display:flex; align-items:stretch; justify-content:center; position:relative; }
-.hero-image { width:100%; height:100%; object-fit:cover; border-radius:12px; box-shadow: 0 20px 60px rgba(2,6,23,0.35); transform: translateY(10px); }
+.hero-mascot { flex: 0 0 38%; display:flex; align-items:stretch; justify-content:center; position:relative; min-width:200px; }
+.hero-image { width:100%; height:100%; object-fit:contain; object-position:center; border-radius:12px; box-shadow: 0 20px 60px rgba(2,6,23,0.35); transform: translateY(10px); background:linear-gradient(135deg, rgba(0,229,255,0.05), rgba(0,119,255,0.05)); }
 
 /* entry + float animation */
 @keyframes heroEntry { from { transform: translateX(30px) scale(0.98); opacity:0 } to { transform: translateX(0) scale(1); opacity:1 } }
@@ -373,7 +402,8 @@ body {
 .hero-image.animate { animation: heroEntry 700ms cubic-bezier(.2,.9,.3,1) both, heroFloat 6s ease-in-out 900ms infinite; }
 @media (max-width:900px) {
   .dashboard-hero { flex-direction:column; gap:12px; padding:18px; }
-  .hero-mascot { width:120px; height:120px; }
+  .hero-mascot { width:100%; max-width:280px; height:auto; aspect-ratio:1/1; flex: 0 0 auto; }
+  .hero-image { max-width:100%; height:auto; }
   .mascot-plate { width:100px; height:100px; border-radius:14px; }
   .hero-bubble { display:none; }
 }
@@ -387,7 +417,8 @@ body {
   .content { padding: 12px 14px 18px; }
   .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; gap: 14px; }
   .dashboard-hero { flex-direction: column; gap: 14px; padding: 18px; }
-  .hero-mascot { width: 100%; max-width: 220px; height: 180px; }
+  .hero-mascot { width: 100%; max-width: 280px; height: auto; aspect-ratio: 16/9; margin: 0 auto; }
+  .hero-image { width: 100%; height: 100%; object-fit: contain; object-position: center; }
   .indicator-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .topbar { flex-direction: column; align-items: flex-start; gap: 12px; padding: 18px 14px 12px; }
   .topbar > div { width: 100%; flex-wrap: wrap; }
@@ -405,19 +436,90 @@ body {
   .nav-item { font-size: 0.9rem; }
   .indicator-grid { grid-template-columns: 1fr; }
   .hero-content p { font-size: 0.95rem; }
-  .hero-image { min-height: 160px; object-fit: cover; }
+  .dashboard-hero { padding: 16px 12px; gap: 12px; }
+  .hero-mascot { width: 100%; max-width: 100%; height: auto; aspect-ratio: 4/3; }
+  .hero-image { width: 100%; height: 100%; object-fit: contain; object-position: center; min-height: 160px; }
   .chat-head { padding: 10px 12px; }
   .chat-inp { padding: 10px; }
   .chat-inp input { font-size: 16px; }
 }
 
+@media (max-width: 480px) {
+  .dashboard-hero { padding: 12px 10px; flex-direction: column; }
+  .hero-content { min-width: 0; }
+  .hero-content h3 { font-size: 1.3rem; }
+  .hero-content p { font-size: 0.9rem; line-height: 1.5; }
+  .hero-mascot { width: 100%; max-width: 100%; height: auto; aspect-ratio: 1/1; }
+  .hero-image { width: 100%; height: 100%; object-fit: contain; object-position: center; }
+}
+
 /* Profile */
-.profile-avatar { width: 110px; height: 110px; border-radius: 8px; background: url('mascot.png') center/contain no-repeat, linear-gradient(135deg, #a855f7, var(--primary)); display: flex; align-items: center; justify-content: center; font-size: 2.5rem; box-shadow: 0 0 20px rgba(168,85,247,0.35); border: 2px solid rgba(255,255,255,0.06); overflow: visible; }
+.profile-avatar { width: 110px; height: 110px; border-radius: 50%; background: linear-gradient(135deg, #a855f7, var(--primary)); display: flex; align-items: center; justify-content: center; font-size: 2.5rem; box-shadow: 0 0 20px rgba(168,85,247,0.35); border: 2px solid rgba(255,255,255,0.06); overflow: hidden; }
 .achievement { background: rgba(0,0,0,0.2); border: 1px solid rgba(0,230,118,0.3); border-radius: 12px; padding: 20px; text-align: center; box-shadow: inset 0 0 20px rgba(0,230,118,0.05); transition: 0.3s; }
 .achievement:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,230,118,0.15), inset 0 0 20px rgba(0,230,118,0.1); border-color: var(--green); }
 
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-thumb { background: rgba(0,229,255,0.3); border-radius: 6px; }
+
+/* Logo modal for sidebar enlargement */
+.logo-modal {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 12000;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.22s ease, visibility 0.22s ease;
+}
+.logo-modal.open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+.logo-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  opacity: 0;
+  transition: opacity 0.24s ease;
+}
+.logo-modal.open .logo-modal-backdrop { opacity: 1; }
+
+@keyframes logoZoomIn {
+  0% {
+    transform: scale(0.78);
+    opacity: 0;
+  }
+  70% {
+    transform: scale(1.03);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.logo-modal-content {
+  position: relative;
+  max-width: 86vw;
+  max-height: 86vh;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+  background: linear-gradient(180deg,#fff,#f6f8fb);
+  padding: 12px;
+  transform: scale(0.9);
+  opacity: 0;
+}
+.logo-modal.open .logo-modal-content {
+  animation: logoZoomIn 320ms cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
+}
+.logo-modal-content img { width: 100%; height: 100%; object-fit: contain; background: #ffffff; }
+.logo-modal-close { position: absolute; top: 8px; right: 8px; z-index: 13000; background: rgba(0,0,0,0.6); color: #fff; border: none; width: 36px; height: 36px; border-radius: 8px; font-size: 20px; cursor: pointer; }
 ::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); }
 
 /* LIGHT MODE VARIABLES */
@@ -509,7 +611,7 @@ body.light-mode .edit-input { background: #fff; color: #000; }
   <div class="sidebar glass" style="display:flex; flex-direction:column; justify-content:space-between;">
     <div>
       <div class="logo" style="display:flex; align-items:center; gap:12px;">
-        <img src="mascot.png" class="mascot" alt="Mascota">
+        <img src="mascot.png" id="sidebar-logo" class="mascot logo-img" alt="Logo" style="cursor:pointer;width:44px;height:44px;border-radius:50%;object-fit:contain;">
         <div>
           <h1 style="font-size:1.4rem;">UrbanPulse</h1>
           <p>{{ t('subtitle') }}</p>
@@ -526,6 +628,14 @@ body.light-mode .edit-input { background: #fff; color: #000; }
     <div style="padding: 20px; border-top: 1px solid rgba(0,229,255,0.2); display:flex; gap:10px; flex-direction:column;">
       <button class="btn-mode" @click="isLight=!isLight">{{ isLight ? t('darkBtn') : t('lightBtn') }}</button>
       <button class="btn-mode" @click="lang = lang==='es'?'en':'es'">🌐 {{ lang.toUpperCase() }}</button>
+    </div>
+  </div>
+  <!-- Logo modal (enlarged view) -->
+  <div id="logo-modal" class="logo-modal" aria-hidden="true">
+    <div class="logo-modal-backdrop" id="logo-modal-backdrop"></div>
+    <div class="logo-modal-content" role="dialog" aria-modal="true">
+      <img id="logo-modal-img" src="mascot.png" alt="Logo enlarged">
+      <button id="logo-modal-close" class="logo-modal-close" aria-label="Cerrar">×</button>
     </div>
   </div>
   <div class="main">
@@ -561,9 +671,7 @@ body.light-mode .edit-input { background: #fff; color: #000; }
               <span style="color:var(--primary)">•</span> <b>EcoRuta</b>: {{ t('descEco') }}<br>
               <span style="color:var(--primary)">•</span> <b>GreenScore</b>: {{ t('descGS') }}</p>
           </div>
-          <div class="hero-mascot" aria-hidden="true">
-            <img src="mascot.png" class="hero-image" :class="{animate: mascotAnimate}" alt="Mascota">
-          </div>
+          <!-- hero image removed as requested -->
         </div>
 
         <div class="grid-4" style="margin-bottom:24px">
@@ -834,8 +942,11 @@ body.light-mode .edit-input { background: #fff; color: #000; }
           <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:32px; position:relative; padding-top:40px;">
             <div style="display:flex;align-items:flex-end;gap:24px;">
               <div class="profile-avatar" :class="{'is-zoomed': profileAvatarZoomed}" @mouseenter="profileAvatarZoomed = true" @mouseleave="profileAvatarZoomed = false" @click="triggerAvatarUpload">
-                <img v-if="profileAvatar" :src="profileAvatar" style="width:100%;height:100%;object-fit:cover;border-radius:8px;">
-                <img v-else src="mascot.png" alt="mascot" style="width:100%;height:100%;object-fit:contain;">
+                <img v-if="profileAvatar" :src="profileAvatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">
+                <svg v-else width="100%" height="100%" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="color:white;">
+                  <circle cx="12" cy="8" r="4" fill="currentColor"/>
+                  <path d="M 4 20 Q 4 14 12 14 Q 20 14 20 20" fill="currentColor"/>
+                </svg>
               </div>
               <div style="padding-bottom:10px;">
                 <h2 style="font-size:2.2rem;margin-bottom:6px;font-weight:800;text-shadow:0 0 15px rgba(255,255,255,0.2)">

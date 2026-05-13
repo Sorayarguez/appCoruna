@@ -52,6 +52,12 @@ services:
     environment:
       - CRATE_HEAP_SIZE=2g
     command: crate -Cdiscovery.type=single-node -Ccluster.name=quantumleap
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4200"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
 
   quantumleap:
     image: orchestracities/quantumleap:latest
@@ -68,7 +74,10 @@ services:
     ports:
       - "3000:3000"
     depends_on:
-      - cratedb
+      cratedb:
+        condition: service_started
+      grafana-seed:
+        condition: service_completed_successfully
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning
       - ./grafana/dashboards:/var/lib/grafana/dashboards
@@ -83,13 +92,25 @@ services:
   grafana-seed:
     image: python:3.11-slim
     depends_on:
-      - cratedb
+      cratedb:
+        condition: service_healthy
     environment:
       - CRATEDB_URL=http://cratedb:4200
     volumes:
       - .:/app
     working_dir: /app
     command: sh -c "pip install requests && python seed_grafana.py"
+    restart: on-failure
+
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0:11434
+    command: serve
 
   backend:
     image: python:3.11-slim
@@ -98,10 +119,14 @@ services:
     volumes:
       - .:/app
     working_dir: /app
+    environment:
+      - OLLAMA_URL=http://ollama:11434/api/generate
+      - OLLAMA_MODEL=phi
     command: sh -c "pip install -r requirements.txt && flask --app main run --host=0.0.0.0 --port=8000"
     depends_on:
       - orion
       - quantumleap
+      - ollama
 
   frontend:
     image: nginx:alpine
@@ -116,3 +141,4 @@ services:
 
 volumes:
   mongo-data:
+  ollama-data:

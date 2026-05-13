@@ -34,16 +34,19 @@ def sql(stmt: str) -> dict:
     return response.json() if response.content else {}
 
 
-def ensure_ready(retries: int = 60) -> None:
+def ensure_ready(retries: int = 120) -> None:
     last_error = None
-    for _ in range(retries):
+    for attempt in range(retries):
         try:
             sql("SELECT 1")
+            print(f"✓ CrateDB is ready (attempt {attempt + 1})")
             return
         except Exception as exc:
             last_error = exc
-            sleep(2)
-    raise RuntimeError(f"CrateDB not ready after retries: {last_error}")
+            if (attempt + 1) % 10 == 0:
+                print(f"Attempt {attempt + 1}/{retries}: Waiting for CrateDB... Error: {exc}")
+            sleep(1)
+    raise RuntimeError(f"CrateDB not ready after {retries} retries: {last_error}")
 
 
 def peak_factor(hour_offset: int) -> float:
@@ -193,7 +196,8 @@ def main() -> None:
         ") VALUES " + ", ".join(flow_rows)
     )
 
-    print(f"Seeded CrateDB with {len(impact_rows)} impact rows and {len(flow_rows)} traffic rows.")
+    print(f"\n✓ Seeded CrateDB with {len(impact_rows)} impact rows and {len(flow_rows)} traffic rows.")
+    print("✓ Grafana dashboards are ready to display data.\n")
 
 
 if __name__ == "__main__":
